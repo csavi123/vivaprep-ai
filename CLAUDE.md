@@ -114,5 +114,5 @@ Work through these in order. For each milestone: tell me **what to learn first**
 Milestone M6 is the first point where I have an end-to-end app I can use for my own learning. Get me there before polishing anything.
 
 ## Where we are now
-- Current milestone: **M1** (M0 done 2026-11-09: Haiku call works with token + cost tracking)
+- Current milestone: **M2** (M1 done 2026-11-10: ask()/ask_tutor() with retries, JSONL cost logging, structured TutorAnswer, 3 tests. Deferred: temperature, async, src/ move)
 - Update this line at the end of each session.
