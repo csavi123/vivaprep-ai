@@ -5,8 +5,8 @@ import random
 import time
 import anthropic
 import dotenv
-from schemas import LLMResult
-
+from schemas import LLMResult, TutorAnswer
+from pydantic import BaseModel
 dotenv.load_dotenv()
 client=anthropic.Anthropic(max_retries=0)
 LOG_FILE= Path("logs/llm_calls.jsonl")
@@ -34,11 +34,11 @@ def log_call(model: str, result: LLMResult) -> None:
 
 
 
-def ask(prompt: str, model: str="claude-haiku-5-5", max_tokens: int=1024)->LLMResult:
+def ask(prompt: str, model: str="claude-haiku-5-5", max_tokens: int=1024,output_format: type[BaseModel] | None = None)->LLMResult:
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
             start_time=time.perf_counter()
-            message=  client.messages.create(
+            message=  client.messages.parse(
                 model=model,
                 max_tokens=max_tokens,
                 messages=[
@@ -46,13 +46,14 @@ def ask(prompt: str, model: str="claude-haiku-5-5", max_tokens: int=1024)->LLMRe
                         "role":"user",
                         "content":prompt,
                     }
-                ]
+                ],
+                output_format=output_format
             )
             stop_time=time.perf_counter()
             
             latency= stop_time-start_time
             cost= message.usage.input_tokens/1000000 * HAIKU_INPUT_PRICE_PER_MTOK + message.usage.output_tokens/1000000 * HAIKU_OUTPUT_PRICE_PER_MTOK
-            result= LLMResult(text=message.content[-1].text,input_tokens=message.usage.input_tokens,output_tokens=message.usage.output_tokens,cost_usd=cost,latency_s=latency,stop_reason=message.stop_reason)
+            result= LLMResult(text=message.content[-1].text,input_tokens=message.usage.input_tokens,output_tokens=message.usage.output_tokens,cost_usd=cost,latency_s=latency,stop_reason=message.stop_reason, parsed=message.parsed_output)
             log_call(model, result)        # write the receipt
             return result
         except anthropic.APIStatusError as e:
@@ -70,3 +71,8 @@ def ask(prompt: str, model: str="claude-haiku-5-5", max_tokens: int=1024)->LLMRe
             delay = BASE_DELAY_S * 2 ** (attempt - 1) + random.uniform(0, 1)
             print(f"Attempt {attempt} failed (connection error), retrying in {delay:.1f}s")
             time.sleep(delay)
+
+
+def ask_tutor(question: str) -> TutorAnswer:
+    result = ask(question, output_format=TutorAnswer)
+    return result.parsed

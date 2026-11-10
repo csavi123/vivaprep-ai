@@ -13,3 +13,4 @@ class LLMResult(BaseModel):
     cost_usd: float
     latency_s: float
     stop_reason: str
+    parsed: BaseModel | None = None
