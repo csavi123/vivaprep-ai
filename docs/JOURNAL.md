@@ -70,3 +70,16 @@
 **Next**
 - M2: eval harness v0, 25 questions with expected answers from one TAI Labs session; `run_evals.py` prints a score
 - Fix the top items in `docs/LIMITS.md` (silent `None` in `ask_tutor`)
+
+## 2026-11-11 · M2 Eval harness v0
+
+**How the LLM judge works**
+
+```
+1. question       ──► the student (ask_tutor) writes an answer
+2. question + answer + key concepts ──► judge()
+3. judge() doesn't mark it itself: it ASKS CLAUDE to mark it, and Claude returns ✅/❌ + a reason per concept
+4. your code counts the ✅s ──► score (e.g. 2/3 = 0.67)
+```
+
+So judge() is the messenger. It packages up the question, the answer and the checklist, hands them to Claude (the real marker), and brings back the marked sheet. The counting happens afterwards, in your main loop.
