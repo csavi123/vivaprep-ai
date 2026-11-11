@@ -123,11 +123,30 @@ class FenceSafeConverter(MarkdownConverter):
         return f"{head}{fence}{body}{fence}{tail}"
 
 
+def tag_code_languages(article) -> None:
+    """Move each code block's header label ("python") onto its <pre>, then drop the header.
+
+    On the site a code block is <figure><figcaption><span>python</span><button>Copy</button>
+    </figcaption><pre>...</pre></figure>. Left alone, the header becomes a "pythonCopy" line.
+    """
+    for caption in article.select("figure > figcaption"):
+        pre = caption.find_next_sibling("pre")
+        label = caption.find("span")
+        if pre and label and label.get_text(strip=True):
+            pre["data-lang"] = label.get_text(strip=True).lower()
+            caption.decompose()
+
+
 def article_to_markdown(article) -> str:
     # Lesson subheadings must sit below the "## subtopic" heading
     for h in article.find_all(["h1", "h2", "h3", "h4", "h5", "h6"]):
         h.name = "h3"
-    md = FenceSafeConverter(heading_style="ATX", bullets="-").convert(str(article))
+    tag_code_languages(article)
+    md = FenceSafeConverter(
+        heading_style="ATX",
+        bullets="-",
+        code_language_callback=lambda pre: pre.get("data-lang"),  # -> ```python
+    ).convert(str(article))
     return re.sub(r"\n{3,}", "\n\n", md).strip()  # collapse runs of blank lines
 
 
