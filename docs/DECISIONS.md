@@ -101,3 +101,88 @@
 - `result.parsed` can be `None` (e.g. the model hits `max_tokens` mid-JSON). Then `ask_tutor()` returns `None` even though its type hint promises a `TutorAnswer`. **To fix:** check `stop_reason` / `parsed` and raise a clear error.
 
 **Interview one-liner:** "I wrapped every model call in one function so reliability (retries with backoff and jitter on transient errors only) and observability (cost and latency logged to JSONL) are guaranteed everywhere. Feature functions like `ask_tutor()` only define the output schema."
+
+## D007 · Ingest sessions 1–17, Content tab only (2026-11-11)
+
+**Decision:** Scrape only the 17 "Learning" sessions, and only the Content tab ("In short" questions + all subtopics).
+
+**Alternatives:**
+- All 23 sessions (18–23 are outside the "Learning · Modules 1–17" section)
+- Also the Assignments and Resources tabs
+
+**Reasons:** The lessons are what the tutor needs to answer from. Assignments could feed quizzes later (M8); Resources are mostly external links. Adding a tab later is a small change to the scraper.
+
+**Revisit at:** M8 (quiz generation), if assignments would help.
+
+## D008 · Log in once by hand and reuse the saved session (2026-11-11)
+
+**Decision:** `login.py` opens a visible browser, I log in by hand, and Playwright saves the session to `auth.json` (`storage_state`). Every other script loads that file.
+
+**Alternatives:**
+- Username and password in `.env`, with the script filling in the login form
+
+**Reasons:** The password never appears in code or config. It works with any login flow (2FA, captchas). `auth.json` is git-ignored and `chmod 600`, because it's a live session token.
+
+**Limits:** The session expires; the scraper detects the redirect to `/auth` and says to run `login.py` again.
+
+## D009 · Store each session as Markdown with YAML front matter (2026-11-11)
+
+**Decision:** One `.md` file per session: `# title`, `## In short`, one `## NN subtopic` per subtopic, lesson subheadings as `###`. Code blocks are fenced with their language (```` ```python ````); a block that contains ``` gets a longer fence (````).
+
+**Alternatives:**
+- HTML: keeps everything, but costs more tokens and buries the structure in tags
+- PDF: loses headings, and text extraction is messy
+- JSON: good for records, but hard to read, and the structure has to be designed
+
+**Reasons:** The M4 chunker splits on headings, so they must survive as plain `#` lines. Markdown drops markup (session 1: 70 KB vs 91 KB for the content-only HTML), I can spot-check it by eye, and Claude reads it well. Language-tagged fences let the chunker find and handle code.
+
+**Revisit at:** M4, if chunking needs a different structure.
+
+## D010 · Click "Expand all" and wait until every subtopic has loaded (2026-11-11)
+
+**Decision:** After the page loads, click "Expand all", then wait until the number of loaded subtopic articles equals the number of subtopic buttons (15s timeout), and only then copy the HTML.
+
+**Alternatives:**
+- Copy the page as loaded: saves 1 of 7 subtopics (the collapsed ones had 0 characters in the HTML)
+- Click each subtopic one by one: 7+ clicks per page, more fragile
+- Wait a fixed number of seconds: either slow or flaky
+
+**Reasons:** The site loads subtopic text only when a section is opened. Waiting for a condition, not a delay, means a slow page fails loudly instead of silently saving partial content.
+
+## D011 · Save a content-only HTML snapshot and convert from it (2026-11-11)
+
+**Decision:** Save just the "In short" and Reading sections to `data/raw/tailabs/html/sNN.html` (with URL and fetch time), and always build the Markdown from that snapshot. `--from-html` rebuilds without visiting the site.
+
+**Alternatives:**
+- No snapshot; re-fetch from the site to validate or to fix conversion bugs
+- Save the whole page (includes navigation and my email)
+
+**Evidence:** Two conversion bugs (nested fence in s03; 187 `pythonCopy` header lines) were fixed by rebuilding all 17 files from snapshots, with 0 page loads. A rebuild of s01 was byte-identical to the live run.
+
+**Tradeoff:** 2.4 MB of local files (17 snapshots); still git-ignored, same rules as the Markdown.
+
+## D012 · Test ingestion against the snapshots, with a measured word-count tolerance (2026-11-11)
+
+**Decision:** `tests/test_ingest_tailabs.py` compares every `.md` with its snapshot: files present, front matter, no junk, identical subtopic headings, code block and table counts, and words per subtopic within 99–102%. Tests skip when the local data isn't there.
+
+**Alternatives:**
+- Compare with the live site: slow, needs login, and breaks when the site changes
+- Exact word match: fails on correct files (Markdown adds list numbers, link URLs)
+- Ad-hoc checks only: not repeatable
+
+**Evidence:** Measured the gap across 124 subtopics before choosing the tolerance: 0% to +0.54%, never fewer words. 86 checks pass in 1.55s with no API calls.
+
+**Limits:** It proves fidelity to the snapshot, not that the snapshot is current, and not that the content is good for RAG (that's M4/M5).
+
+## D013 · Keep "Check yourself" questions in the files; handle leakage in M4 (2026-11-11)
+
+**Decision:** Keep each subtopic's "Check yourself" questions in the Markdown for now.
+
+**Alternatives:**
+- Strip them during ingestion
+
+**Reasons:** They're a labelled eval set (each question's answer is in a known subtopic), and ingestion should keep the source complete.
+
+**Risk:** If they're indexed, retrieval matches each question to the chunk that contains its own text, so recall@k looks nearly perfect but means nothing (test-set leakage).
+
+**Revisit at:** M4: extract them into `evals/datasets/`, and leave them out of what gets indexed.

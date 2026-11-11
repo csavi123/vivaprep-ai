@@ -114,5 +114,6 @@ Work through these in order. For each milestone: tell me **what to learn first**
 Milestone M6 is the first point where I have an end-to-end app I can use for my own learning. Get me there before polishing anything.
 
 ## Where we are now
-- Current milestone: **M2** (M1 done 2026-11-10: ask()/ask_tutor() with retries, JSONL cost logging, structured TutorAnswer, 3 tests. Deferred: temperature, async, src/ move)
+- Current milestone: **M4** (M3 done 2026-11-11: 17 sessions → Markdown + HTML snapshots in `data/raw/tailabs/`, `ingest/` scripts, 86 ingestion tests passing. Open: spot-check s04/s09, break-it experiments)
+- Pending from M2: full 25-question baseline (2–3 runs, record the range), temperature experiment. Deferred: async, `src/compass/` move
 - Update this line at the end of each session.
