@@ -6,3 +6,6 @@ logs/
 .vscode/
 data/
 evals/datasets/
+
+# Browser login session (TAI Labs cookies) - never commit
+auth.json
