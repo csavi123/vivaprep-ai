@@ -24,7 +24,7 @@ from pathlib import Path
 
 import frontmatter
 from bs4 import BeautifulSoup
-from markdownify import markdownify
+from markdownify import MarkdownConverter
 from playwright.sync_api import Page, expect, sync_playwright
 
 AUTH_FILE = Path("auth.json")
@@ -105,11 +105,29 @@ def intro_questions(soup: BeautifulSoup) -> list[str]:
     return questions
 
 
+class FenceSafeConverter(MarkdownConverter):
+    """Use a longer fence when the code itself contains ``` (e.g. an example README).
+
+    Otherwise the inner ``` closes the outer block early, and the example's
+    "# headings" leak out as real headings.
+    """
+
+    def convert_pre(self, el, text, parent_tags):
+        md = super().convert_pre(el, text, parent_tags)
+        longest = max((len(run) for run in re.findall(r"`+", text)), default=0)
+        if longest < 3:
+            return md  # normal case: ``` is safe
+        fence = "`" * (longest + 1)
+        head, rest = md.split("```", 1)     # replace the opening fence...
+        body, tail = rest.rsplit("```", 1)  # ...and the closing fence
+        return f"{head}{fence}{body}{fence}{tail}"
+
+
 def article_to_markdown(article) -> str:
     # Lesson subheadings must sit below the "## subtopic" heading
     for h in article.find_all(["h1", "h2", "h3", "h4", "h5", "h6"]):
         h.name = "h3"
-    md = markdownify(str(article), heading_style="ATX", bullets="-")
+    md = FenceSafeConverter(heading_style="ATX", bullets="-").convert(str(article))
     return re.sub(r"\n{3,}", "\n\n", md).strip()  # collapse runs of blank lines
 
 
