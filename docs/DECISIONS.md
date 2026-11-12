@@ -186,3 +186,40 @@
 **Risk:** If they're indexed, retrieval matches each question to the chunk that contains its own text, so recall@k looks nearly perfect but means nothing (test-set leakage).
 
 **Revisit at:** M4: extract them into `evals/datasets/`, and leave them out of what gets indexed.
+
+## D014 · Postgres + pgvector in Docker Compose (2026-11-12)
+
+**Decision:** Run `pgvector/pgvector:0.8.7-pg17` with Docker Compose, bound to `127.0.0.1:5433`, with data in a named volume (`pgdata`). The password comes from `.env`.
+
+**Alternatives:**
+- Install Postgres with Homebrew: no container, but harder to reset, and it doesn't match how it'll be deployed
+- Pinecone or another hosted vector DB: one more account and service; keeps vectors apart from the metadata and the full-text search planned for M7
+
+**Reasons:** One SQL database holds the chunks, their metadata and their vectors, and later full-text search for hybrid retrieval. Pinning an exact image tag makes it reproducible. Binding to `127.0.0.1` keeps it off the network. Port 5433 avoids clashing with a local Postgres.
+
+## D015 · Voyage embeddings first, behind one `embed()` function (2026-11-12)
+
+**Decision:** Start with Voyage (`voyage-4-lite`, 1024 dimensions) and call it only through one `embed()` function, so a local model can be swapped in to compare.
+
+**Alternatives:**
+- OpenAI `text-embedding-3-small`: no OpenAI credits (D001)
+- A local model (e.g. bge-small): free and offline, but likely lower quality; kept as a later comparison
+
+**Evidence:** The voyage-4 models include 200M free tokens; the whole course is ≈344K tokens. The test call returned 1024 dimensions. Open: it reported `tokens = 0` for "hello", so check token logging on real chunks.
+
+**Revisit at:** M7, with a measured Voyage vs local comparison.
+
+## D016 · First retrieval eval set: "In short" questions from sessions 1–14 (2026-11-12)
+
+**Decision:** `evals/build_retrieval_set.py` writes `retrieval_v1.jsonl`: 46 questions with session labels. Subtopic labels are added by hand later, as I study each module. Sessions 15–17 are left out (all 9 questions).
+
+**Alternatives:**
+- All 55 "In short" questions
+- Drop only the first question of s15–s17 (52 questions)
+- The 464 learning objectives and "Check yourself" questions: far more questions, but more labelling
+
+**Reasons:** s15–s17 are interview and system-design prompts (e.g. "Design an AI system that [X] end-to-end"). No single lesson section answers them, so "the right chunk" can't be labelled. The script refuses to overwrite the file without `--force`, so hand-added labels are never lost. `tests/test_retrieval_set.py` checks the count, unique ids, the exclusions and clean queries.
+
+**Known gap:** recall@k doesn't measure retrieval for s15–s17 at all.
+
+**Revisit at:** M5, adding subtopic labels, "Check yourself" questions and my own 10 questions.
