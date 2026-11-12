@@ -1,0 +1,21 @@
+services:
+  db:
+    image: pgvector/pgvector:0.8.7-pg17       # Postgres 17 with pgvector pre-installed, pinned
+    container_name: compass-db
+    environment:
+      POSTGRES_USER: compass
+      POSTGRES_DB: compass
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}  # read from .env
+    ports:
+      - "127.0.0.1:5433:5432"                 # Mac port 5433 -> container 5432, only reachable from this Mac
+    volumes:
+      - pgdata:/var/lib/postgresql/data       # named volume: data survives restarts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U compass -d compass"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgdata:
