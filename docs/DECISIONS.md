@@ -209,6 +209,8 @@
 
 **Revisit at:** M7, with a measured Voyage vs local comparison.
 
+**Status:** replaced by D018 (2026-11-13).
+
 ## D016 · First retrieval eval set: "In short" questions from sessions 1–14 (2026-11-12)
 
 **Decision:** `evals/build_retrieval_set.py` writes `retrieval_v1.jsonl`: 46 questions with session labels. Subtopic labels are added by hand later, as I study each module. Sessions 15–17 are left out (all 9 questions).
@@ -255,3 +257,39 @@
 **Limits:** tokens are estimated as chars ÷ 4. Exclusion relies on fixed marker phrases. It needs clean headings.
 
 **Revisit at:** M4 step 6. Compare recall@5 for 800 against `None`.
+
+## D018 · Switch embeddings from Voyage to BGE-M3, running locally (2026-11-13)
+
+**Decision:** Embed chunks and questions with **`BAAI/bge-m3`** through `sentence-transformers`, on the Mac GPU (`mps`). The revision is pinned to `5617a9f61b028005a4858fdac845db406aefb181`. All embedding goes through **`rag/embeddings.py`** (`load_model`, `embed`, `count_tokens`), so chunks and questions always use the same model and settings. This replaces D015 (Voyage).
+
+**Why the change:** The first Voyage run failed with `RateLimitError`. Without a payment method, the account is limited to **3 requests and 10K tokens per minute**, and one 64-chunk batch was about 35K tokens. I chose not to add a card. Staying within the free limits would have meant about 35 minutes per run.
+
+**Alternatives:**
+- Voyage with a card added: fast and likely the stronger model, but needs billing set up
+- Voyage on the free limits: no code change, but about 35 min per run
+- `bge-small-en-v1.5` or `all-MiniLM-L6-v2`: max input 512 or 256 tokens. The median chunk is 557 tokens, so about half the chunks would be **cut off silently**.
+- `nomic-embed-text-v1.5`: 8K context, but 768 dimensions (a schema change) and it needs `search_query:` / `search_document:` prefixes
+
+**Evidence:**
+- BGE-M3 reads 8,192 tokens. The longest chunk is **1,233 real tokens**, so nothing is cut.
+- It outputs **1,024 dimensions**, so the existing `vector(1024)` table is unchanged.
+- Smoke test: unit-length vectors, and related sentences scored above unrelated ones (0.633 vs 0.505).
+- Full run: **591 rows**, 17 sessions, all vectors 1,024 dimensions with length 1.000, 317,375 real tokens, 5.3 min, $0.
+- Nearest neighbours of `s01-c001` were all session 1 chunks (distances 0.21–0.22).
+
+**What changed in the code:**
+- `sentence-transformers` + PyTorch added to `requirements.txt`.
+- The model (~2.3 GB) is cached in `~/.cache/huggingface/`, outside the repo.
+- The length check uses the model's tokenizer, because `sentence-transformers` truncates silently.
+- Batches of 16: an untested default (6–13 s per batch). Benchmark 8–64 before tuning.
+- Latency is logged in place of cost.
+- Run with `python -m rag.embed_store`.
+
+**Tradeoffs:**
+- ✅ Free, no rate limits, and **course text never leaves my machine**, which fits the "TAI Labs content stays local" rule.
+- ❌ A large install (PyTorch plus a 2.3 GB model). About 5 min per full re-embed, compared with about 30s for an API.
+- ❌ **Deployment (M13):** the app must load BGE-M3 to embed each question, which needs **~2–3 GB of RAM**, more than most free hosting tiers. Options: a paid instance with the model baked into the Docker image, or a hosted embedding API. The API route means re-embedding every chunk with that API's model.
+- ❓ Quality compared with Voyage is **not measured**.
+- Chars ÷ 4 overestimated the real token count by about 4% (330K estimated vs 317K real).
+
+**Revisit at:** M7. Compare BGE-M3 with Voyage on the same 46-question recall@5 eval. M13: deployment memory.
