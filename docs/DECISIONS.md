@@ -223,3 +223,35 @@
 **Known gap:** recall@k doesn't measure retrieval for s15–s17 at all.
 
 **Revisit at:** M5, adding subtopic labels, "Check yourself" questions and my own 10 questions.
+
+## D017 · Heading-based chunks, packed up to 800 tokens (2026-11-12)
+
+**Decision:** `rag/chunker.py` splits each lesson at `##` and `###` headings outside code, then packs neighbouring sections **of the same subtopic** up to 800 tokens. The cap is measured on the exact embedded text (heading path + `###` lines included, via one `render()` function). A section over 800 on its own stays whole. Every chunk starts with a heading path (`Title > Subtopic > Section`), also stored as a field. Result: **591 chunks**, median 557 tokens, 30 over 800 (all single sections).
+
+**Alternatives:**
+- One chunk per `##` subtopic: 124 chunks, median ~2,400 tokens (too broad, diluted vectors). Kept as `max_tokens=None` for comparison.
+- Fixed-size windows with overlap: cut mid-sentence and mid-code, no clean subtopic label.
+- LangChain's Markdown splitters: don't remove eval text or handle nested fences; I'd write that logic anyway.
+
+**Evidence:** Measured before choosing:
+- subtopic median ~2,400 tokens, every one over 800
+- `###` section median ~360, 90% under ~600, 97% under 800
+- largest code block 571 tokens, so code never needs splitting
+
+**Eval text kept out of the index (leakage):** "In short", learning objectives and `**Check yourself**` lists, about 28K tokens.
+- **Known exception:** s13 quotes its own eval question (s13-q2) in "Answering the question". That's lesson content, so it stays, and s13-q2 is an easy question.
+- s17 does the same, but s17 isn't in the eval set.
+
+**Bugs caught by count checks:**
+- 714 vs 831 sections: intros were never appended
+- 89 chunks over 800: the headings weren't counted. Fixed with `render()`.
+
+**Other choices:**
+- No overlap, because the heading path gives context.
+- `module` and `module_title` dropped from chunks, because they equal `session` and `title` in this course.
+
+**Tests:** `tests/test_chunker.py`, 12 tests (rules on a made-up lesson, plus checks on the real chunks).
+
+**Limits:** tokens are estimated as chars ÷ 4. Exclusion relies on fixed marker phrases. It needs clean headings.
+
+**Revisit at:** M4 step 6. Compare recall@5 for 800 against `None`.
