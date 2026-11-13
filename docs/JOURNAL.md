@@ -130,3 +130,64 @@ So judge() is the messenger. It packages up the question, the answer and the che
 - M4: chunking + Voyage embeddings + pgvector. The chunker must ignore `#` lines inside code blocks; keep "Check yourself"
   questions out of the index (leakage) and use them as a labelled retrieval eval set
 - Still pending from M2: full 25-question baseline (run 2–3 times and record the range); temperature experiment
+
+## 2026-11-12 · M4 eval set + chunker
+
+**Built**
+- Docker Postgres 17 + pgvector 0.8.7 on `127.0.0.1:5433` (D014)
+- `evals/build_retrieval_set.py` → `retrieval_v1.jsonl`: 46 "In short" questions from s01–s14, labelled by session;
+  refuses to overwrite without `--force`. `tests/test_retrieval_set.py` (4 tests)
+- `rag/chunker.py`: split at `##`/`###` outside code, drop eval text, pack same-subtopic sections up to 800 tokens
+  (measured on the rendered text via `render()`), heading path in every chunk; `--write` → `data/processed/chunks.jsonl`
+- `tests/test_chunker.py`: 12 tests (rules on a made-up lesson + checks on the real chunks) (D017)
+
+**Learned**
+- Measure before choosing a chunk size: subtopics median ~2,400 tokens (too big), `###` sections median ~360 (97% under 800)
+- Median vs average: the median isn't pulled up by a few huge values
+- `break` vs `continue`; `[2:]` slicing; `json.dumps`/`json.loads`; `if __name__ == "__main__"`; `python -m` vs `python file.py`
+- Eval data must stay out of the index (leakage); a leakage test can also catch false alarms (lesson text quoting a question)
+- One function that builds the text (`render`) for both the size check and the output, so they can't disagree
+
+**Confused me**
+- `sys.argv`, list vs single item; empty `else:`; indentation of checks inside vs after a loop
+- Why "Answering the question" quotes the eval question, and whether that counts as leakage (decided: it's content)
+
+**Numbers**
+- 17 files → 124 subtopics → 831 sections → 591 chunks, median 557 tokens, 30 over 800 (all single sections)
+- Count checks caught 2 bugs: 714 vs 831 sections (intros never appended); 89 vs 30 chunks over 800 (headings not counted)
+
+## 2026-11-13 · M4 table, embeddings, search, first recall
+
+**Built**
+- `rag/schema.sql`: `chunks` table, `vector(1024)`, HNSW cosine index
+- Switched embeddings from Voyage to local **BGE-M3** (D018): `rag/embeddings.py` (pinned revision, one place for
+  documents and queries), `rag/embed_store.py` (token-limit check, batches of 16, upsert by `chunk_id`)
+- `rag/search.py`: `search(question, k)`: embed query, `ORDER BY embedding <=> %s LIMIT k`, score = 1 − distance
+- `evals/run_retrieval_eval.py`: session-level recall@1 and recall@5 on the 46 questions, prints misses
+
+**Learned**
+- Schema vs data: `CREATE TABLE` builds the shelf once; `INSERT … ON CONFLICT DO UPDATE` (upsert) fills it, safely re-runnable
+- Parameterised SQL (`%s`), never f-strings; `EXCLUDED` = the row I tried to insert
+- Batching (fewer round trips, within limits, commit per batch)
+- Rate limits are a real constraint: Voyage free tier = 3 RPM / 10K TPM
+- Choosing a model from my data: context length vs chunk sizes (bge-small would truncate half), dimensions vs schema
+- sentence-transformers truncates silently → check tokens with the model's own tokenizer
+- Cosine ignores vector length; normalising makes every distance agree
+- A model is an artifact, not a pip package: pin its revision; deployment needs ~2–3 GB RAM for it
+- Offline indexing vs online serving; retrieval is the "R" in RAG and is evaluated on its own first
+
+**Confused me**
+- `ModuleNotFoundError: No module named 'rag'` → run with `python -m rag.embed_store`
+- Why `embeddings.py` was needed now but not with Voyage (local model = my code does the server's work)
+- The search output format (heading path repeated in the preview, `\n`)
+
+**Numbers**
+- Embedding: 591 rows, 1024 dims, unit length, 317,375 real tokens (chars/4 estimate 330K, +4%), longest chunk 1,233 tokens, 5.3 min, $0
+- **Baseline retrieval (800-cap chunks, BGE-M3): recall@1 = 36/46 = 78%, recall@5 = 45/46 = 98%**
+- Only miss: s01-q1 (tokens + cost + context window), got sessions [5, 4, 5, 5, 5]: a multi-part question taught across
+  3 sessions, so more a single-label limit than a retrieval failure
+
+**Next**
+- Print and read the 10 rank-1 misses; decide how to handle multi-session questions like s01-q1
+- Compare 800-cap vs one chunk per subtopic (`max_tokens=None`) on the same 46 questions, then D019
+- M4 explain-back and close; then M5 (answers with citations)

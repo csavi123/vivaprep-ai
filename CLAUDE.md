@@ -54,7 +54,7 @@ Before I stop, help me:
 - **Models:** Anthropic SDK only (no OpenAI credits; OpenAI optional later), behind my own `llm.py` wrapper (retries, token counting, cost logging). Use the cheapest model, **Claude Haiku**, while developing.
 - **Structured output:** Pydantic + `client.messages.parse()`
 - **Ingestion:** Playwright, markdownify, python-frontmatter
-- **Retrieval:** my own heading-based chunker, embeddings (Voyage; Anthropic has no embeddings API), **Postgres + pgvector**, Postgres full-text search for hybrid, a reranker later
+- **Retrieval:** my own heading-based chunker, embeddings (BGE-M3 running locally, D018; Voyage as a later comparison), **Postgres + pgvector**, Postgres full-text search for hybrid, a reranker later
 - **Agents:** hand-written agent loop with native tool calling
 - **Protocols:** official MCP Python SDK (FastMCP), official A2A Python SDK
 - **App:** FastAPI + Streamlit (Next.js later, optional)
@@ -114,6 +114,7 @@ Work through these in order. For each milestone: tell me **what to learn first**
 Milestone M6 is the first point where I have an end-to-end app I can use for my own learning. Get me there before polishing anything.
 
 ## Where we are now
-- Current milestone: **M4** (M3 done 2026-11-11: 17 sessions → Markdown + HTML snapshots in `data/raw/tailabs/`, `ingest/` scripts, 86 ingestion tests passing. Open: spot-check s04/s09, break-it experiments)
+- Current milestone: **M4, almost done** (2026-11-13: 591 chunks embedded with BGE-M3 in pgvector, `search()` works, baseline session-level recall@1 = 78%, recall@5 = 98% on 46 questions. Next: read the rank-1 misses, compare 800-cap vs one chunk per subtopic, D019, explain-back, then M5)
+- Open from M3: spot-check s04/s09, break-it experiments
 - Pending from M2: full 25-question baseline (2–3 runs, record the range), temperature experiment. Deferred: async, `src/compass/` move
 - Update this line at the end of each session.
