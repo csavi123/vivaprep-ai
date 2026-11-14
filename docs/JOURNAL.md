@@ -191,3 +191,36 @@ So judge() is the messenger. It packages up the question, the answer and the che
 - Print and read the 10 rank-1 misses; decide how to handle multi-session questions like s01-q1
 - Compare 800-cap vs one chunk per subtopic (`max_tokens=None`) on the same 46 questions, then D019
 - M4 explain-back and close; then M5 (answers with citations)
+
+## 2026-11-14 · M4 close: error analysis + baseline decision
+
+**Built**
+- `run_retrieval_eval.py` now records the rank of the first correct session and the top-5 heading paths, prints every
+  question not ranked #1, and saves a per-question report to `evals/reports/` (git-ignored: course text)
+- Local error-analysis note for the 10 non-#1 questions; D019 (accept the baseline, fix the eval before the search)
+
+**Learned**
+- recall@k is a metric I computed by hand (count hits, divide by 46), not a library function; with one label per
+  question it's the same as hit rate@k
+- The score decides the order inside search; the eval only reads the order and the sessions, against the answer key
+- At serving time there's no answer key: the same search ranks chunks and Claude writes one answer from them
+- Error analysis before fixing: most "misses" were relevant results from another session that revisits the topic,
+  so the label was too strict, not the search
+- The per-question report is a baseline to diff later runs against (catches regressions an average hides)
+- Course content must not be published: the walkthrough page with real data stayed a local file
+
+**Confused me**
+- Where the similarity comparison happens (SQL `<=>` in `search.py`) vs where recall is computed (the eval)
+- Why save a report of all 46 when only 10 need reading (answer: it's for comparing future runs)
+- Session-level eval being lenient: any chunk from the right session counts
+
+**Numbers**
+- Ranks of the 46: rank 1 × 36, rank 2 × 6, rank 4 × 1, rank 5 × 2, not in top 5 × 1
+- Of the 10 not ranked #1: 7 overlap (s15 took #1 three times), 3 ordering errors (s03-q1, s06-q1, s09-q1)
+
+**Still open**
+- Explain-back questions 2–4 (why this approach, how I know it works, limits): answer before interviews
+- Subtopic labels with multiple correct answers (M5); reranker, 800 vs `None`, Voyage vs BGE-M3 (M7)
+
+**Next**
+- M5: RAG answers with citations (search → prompt with numbered chunks → Claude via `llm.py` → citation + answer evals)

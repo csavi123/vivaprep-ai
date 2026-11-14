@@ -114,7 +114,7 @@ Work through these in order. For each milestone: tell me **what to learn first**
 Milestone M6 is the first point where I have an end-to-end app I can use for my own learning. Get me there before polishing anything.
 
 ## Where we are now
-- Current milestone: **M4, almost done** (2026-11-13: 591 chunks embedded with BGE-M3 in pgvector, `search()` works, baseline session-level recall@1 = 78%, recall@5 = 98% on 46 questions. Next: read the rank-1 misses, compare 800-cap vs one chunk per subtopic, D019, explain-back, then M5)
+- Current milestone: **M5** (M4 done 2026-11-14: 591 chunks embedded with BGE-M3 in pgvector, `rag/search.py`, baseline session-level recall@1 = 78%, recall@5 = 98% on 46 questions, D017–D019. Open from M4: explain-back Q2–4; deferred to M7: reranker, 800 vs `None`, Voyage vs BGE-M3)
 - Open from M3: spot-check s04/s09, break-it experiments
 - Pending from M2: full 25-question baseline (2–3 runs, record the range), temperature experiment. Deferred: async, `src/compass/` move
 - Update this line at the end of each session.

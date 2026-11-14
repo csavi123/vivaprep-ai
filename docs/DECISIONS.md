@@ -293,3 +293,41 @@
 - Chars ÷ 4 overestimated the real token count by about 4% (330K estimated vs 317K real).
 
 **Revisit at:** M7. Compare BGE-M3 with Voyage on the same 46-question recall@5 eval. M13: deployment memory.
+
+## D019 · Retrieval baseline, and fix the eval before the search (2026-11-14)
+
+**Decision:** Accept the current retrieval as the M4 baseline and move on to M5. Don't tune search yet. When improving retrieval (M7), **fix the eval labels first, then try a reranker**.
+
+**Baseline** (591 chunks with the 800-token cap from D017, BGE-M3 from D018, cosine top-5, 46 session-labelled questions from s01–s14):
+- **recall@1 = 36/46 = 78%**
+- **recall@5 = 45/46 = 98%**
+- Per-question results are saved locally in `evals/reports/retrieval_v1_2026-11-14.jsonl` (git-ignored).
+
+**Error analysis** of the 10 questions not ranked #1 (ranks: 2 × 6, 4 × 1, 5 × 2, not in the top 5 × 1):
+- **7 overlap:** the #1 result is genuinely relevant, from another session that teaches or revisits the topic (s15 System design 3 times, plus s10, s12, and s4/s5 for a multi-part question). The single-session label is too strict.
+- **3 ordering errors:** an off-topic #1, with the right lesson at #2.
+- No wording-mismatch or chunking failures found.
+
+**Alternatives:**
+- Tune retrieval now (reranker, hybrid search, chunk size): premature, because most failures are label problems, and the M5 answers will show which failures actually matter.
+- Change the failing labels to match the results: rejected. That grades the eval with search's own answers.
+
+**Evidence / reasons:**
+- With recall@5 at 98%, Claude will see the right lesson for 45 of 46 questions in M5.
+- Most non-#1 cases sit at rank 2, so the right content is close to the top.
+- CLAUDE.md: a thin end-to-end slice first, then improve whatever the evals say is weakest.
+
+**Limits:**
+- Session-level is lenient: any of about 35 chunks in the session counts as a hit.
+- 46 questions is small: one question is about 2 points.
+- s13-q2 is easy, because its answer chunk quotes it (D017).
+- s15–s17 aren't measured (D016).
+
+**Next (M5 → M7):**
+1. Subtopic labels with several correct answers allowed (M5, while studying).
+2. Re-measure.
+3. Try a reranker. It should fix the 3 ordering errors without breaking today's rank-1 hits.
+4. 800-cap vs one chunk per subtopic.
+5. Voyage vs BGE-M3.
+
+**Revisit at:** M7.
