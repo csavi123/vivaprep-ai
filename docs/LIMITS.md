@@ -17,3 +17,9 @@ What the code doesn't handle yet. Tick an item off (and note the commit) when it
 - [ ] **Test gaps.** Nothing tests the 400 → raise immediately path, the give-up-after-3 path, or the log write. Every test calls the real API, so it costs money and fails without a network connection.
 
 **Interview framing:** "It's a reliable, observable wrapper for single-turn Haiku calls. Its known limits are silent `None` on truncated structured output, cost that's only correct for Haiku, and no logging of failed attempts. I've written those down as the next fixes."
+
+## Ingestion: `ingest/tailabs.py` (found 2026-11-14, M5)
+
+- [ ] **Missing spaces in chunk text.** Words run together in some places: "aretwo", "fewthousand", "thewords", "toa human", "twoseparate", "bereverse-engineering". Likely cause (not confirmed yet): markdownify drops the space next to some inline elements (links, bold, italic).
+  *Impact:* Claude still reads it fine (M5). It may slightly hurt embeddings, and it will hurt keyword search, because "aretwo" won't match "two".
+  *Fix before M7 full-text search:* compare one case with the original HTML to confirm the cause, fix the conversion, re-ingest, re-embed, and re-run the retrieval eval.
