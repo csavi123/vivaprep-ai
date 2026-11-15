@@ -23,3 +23,11 @@ What the code doesn't handle yet. Tick an item off (and note the commit) when it
 - [ ] **Missing spaces in chunk text.** Words run together in some places: "aretwo", "fewthousand", "thewords", "toa human", "twoseparate", "bereverse-engineering". Likely cause (not confirmed yet): markdownify drops the space next to some inline elements (links, bold, italic).
   *Impact:* Claude still reads it fine (M5). It may slightly hurt embeddings, and it will hurt keyword search, because "aretwo" won't match "two".
   *Fix before M7 full-text search:* compare one case with the original HTML to confirm the cause, fix the conversion, re-ingest, re-embed, and re-run the retrieval eval.
+
+## Retrieval: `rag/search.py` (found 2026-11-14, M6)
+
+- [ ] **No minimum similarity score.** `search()` always returns the k closest chunks, even for off-topic questions
+  ("weather in Bangalore" got 5 chunks scoring 0.35–0.38). Claude abstains correctly (prompt rule 3), but each
+  off-topic question still costs a Claude call. The UI hides the chunks when the tutor abstains.
+  *Idea for M7:* skip the Claude call when the top score is below a threshold, with the threshold chosen from eval
+  data (scores of in-course vs off-topic questions), not guessed.

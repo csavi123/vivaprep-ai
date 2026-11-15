@@ -61,7 +61,16 @@ html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
 
 /* ---- Text ---- */
 h1, h2, h3 { font-family: var(--font); letter-spacing: -0.02em; color: var(--text); }
-h3 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
+/* Section labels (st.subheader = h3): small grey caps. Streamlit's own heading rule is more specific,
+   so the size and color need !important to win. */
+[data-testid="stHeading"] h3, h3 {
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted) !important;
+  padding-top: 1.5rem !important;
+}
 [data-testid="stCaptionContainer"] { color: var(--text-muted); }
 
 /* ---- Hero (title block, built in app.py) ---- */

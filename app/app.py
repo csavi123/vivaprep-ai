@@ -86,6 +86,10 @@ def render_retrieval(rag: RagResult) -> None:
     Cited chunks are highlighted; the rest are dimmed. This is the part that makes RAG visible:
     what search found, how close each chunk was, and which ones the answer actually used.
     """
+    if not rag.answer.in_course:
+        # Search always returns the k closest chunks, even for off-topic questions (no minimum score).
+        # When the tutor abstained, those chunks are just noise, so the answer alone says "not in the course".
+        return
     # Claude can cite the same block several times (e.g. two quotes from block 1),
     # so group the quotes by block first: {block number: [quote, quote, ...]}
     quotes_by_block = {}
