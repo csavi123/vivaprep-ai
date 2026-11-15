@@ -224,3 +224,48 @@ So judge() is the messenger. It packages up the question, the answer and the che
 
 **Next**
 - M5: RAG answers with citations (search → prompt with numbered chunks → Claude via `llm.py` → citation + answer evals)
+
+## 2026-11-14 · M5 slice (answers with citations) + M6 app (VivaPrep AI)
+
+**Built**
+- `schemas.py`: `Citation` (block number + exact quote), `GroundedAnswer` (answer, citations, `in_course`),
+  `RagResult` (Claude's answer + retrieved chunks + invalid citations + cost/latency; built by my code, not sent to Claude)
+- `rag/answer.py`: `format_context()` (numbered `[n] Session X` blocks), `PROMPT_TEMPLATE` (rules → context → question),
+  `answer()` (search → prompt → `llm.ask(output_format=GroundedAnswer)` → `None` check → citation validation)
+- `app/app.py` + `app/styles.py` + `.streamlit/config.toml`: Streamlit app "VivaPrep AI": question form,
+  pipeline strip (retrieve → generate → cite), answer card, retrieval panel (all 5 chunks with similarity bars,
+  cited ones highlighted with quotes, others dimmed), dark theme with design tokens in one file
+- `docs/LIMITS.md`: ingestion drops spaces next to some inline elements ("aretwo")
+
+**Learned**
+- Grounding = answer only from the given context; abstention = say "not in the course" instead of guessing
+- Cite block numbers, not chunk IDs: short ints are easy for the model to copy and easy for my code to validate
+- Keep the model's contract (`GroundedAnswer`) separate from my code's result (`RagResult`), or Claude would be
+  asked to invent cost and chunk data
+- Python `#` comments never reach Claude; `Field(description=...)` does (it goes into the JSON schema)
+- At query time the question must be embedded with the same model as the chunks, so whoever runs search needs
+  BGE-M3 in memory or an embedding API (this drives the deploy choice)
+- Streamlit reruns the whole script on every interaction: `@st.cache_resource` for the model, `st.form` so
+  Claude is only called on Ask
+- Only `answer()` costs money (Claude); search is local and free
+
+**Confused me**
+- Whether FastAPI was needed already (answer: not until a second client needs the RAG over HTTP)
+- Where the model loads (the Streamlit server process, not the browser)
+
+**Numbers**
+- Smoke test: "What is a token?" → `in_course=True`, 2 citations to s01-c006, quotes match the chunk;
+  "How do I bake sourdough bread?" → `in_course=False`, no citations
+- 3,155–4,211 input tokens per question (5 chunks); ~$0.0004–0.0005 per question; Claude latency 2.0–2.5 s
+- Haiku prices in `llm.py` ($0.10 / $0.50 per MTok) not yet checked against Anthropic's pricing page
+
+**Still open**
+- M5 Steps 4–6: unit tests for `format_context` / citation validation, RAG eval (recall@k, citation accuracy,
+  closed-book vs open-book, abstention), D-entry with the baseline
+- New UI (pipeline + retrieval panel) not yet checked on screen; Inter font not loading
+- Quotes aren't verified against the chunk text; `in_course=False` with citations isn't flagged
+
+**Next**
+- Check the new UI, record a 20–30 s demo, LinkedIn post (only measured numbers)
+- FastAPI `POST /ask` → Supabase (re-run retrieval eval) → deploy (private HF Space, spend limit)
+- Back to the M5 eval

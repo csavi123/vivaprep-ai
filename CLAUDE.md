@@ -114,7 +114,10 @@ Work through these in order. For each milestone: tell me **what to learn first**
 Milestone M6 is the first point where I have an end-to-end app I can use for my own learning. Get me there before polishing anything.
 
 ## Where we are now
-- Current milestone: **M5** (M4 done 2026-11-14: 591 chunks embedded with BGE-M3 in pgvector, `rag/search.py`, baseline session-level recall@1 = 78%, recall@5 = 98% on 46 questions, D017–D019. Open from M4: explain-back Q2–4; deferred to M7: reranker, 800 vs `None`, Voyage vs BGE-M3)
+- Current milestone: **M6** (2026-11-14: M5 slice done: `rag/answer.py` with grounded citations, smoke test passes, ~$0.0005/question, D020. M6 app "VivaPrep AI" in `app/` (Streamlit, dark theme, pipeline strip, retrieval panel), D021–D022. New UI not yet checked on screen.)
+- **Open from M5:** Steps 4–6: unit tests, RAG eval (recall@k, citation accuracy, closed- vs open-book, abstention), baseline D-entry
+- **Next:** check UI → demo video + LinkedIn post → FastAPI `POST /ask` → Supabase → deploy (private HF Space)
+- Open from M4: explain-back Q2–4; deferred to M7: reranker, 800 vs `None`, Voyage vs BGE-M3
 - Open from M3: spot-check s04/s09, break-it experiments
 - Pending from M2: full 25-question baseline (2–3 runs, record the range), temperature experiment. Deferred: async, `src/compass/` move
 - Update this line at the end of each session.

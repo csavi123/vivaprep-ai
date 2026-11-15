@@ -1,0 +1,13 @@
+# Streamlit's built-in theme: gives every widget dark colors before our custom CSS (app/styles.py) runs.
+# TOML can't import Python, so these colors are copied from the tokens in app/styles.py: keep them in sync.
+
+[theme]
+base = "dark"
+backgroundColor = "#0A0A0B"            # BG: near-black page
+secondaryBackgroundColor = "#111113"   # SURFACE: inputs, cards, expanders
+textColor = "#FAFAFA"                  # TEXT: zinc-50
+primaryColor = "#7C6CF6"               # the accent (middle of the indigo -> violet gradient)
+font = "sans serif"                    # Inter itself is loaded in app/styles.py
+
+[client]
+toolbarMode = "minimal"                # hide developer menu items (including the "Deploy" button)

@@ -331,3 +331,59 @@
 5. Voyage vs BGE-M3.
 
 **Revisit at:** M7.
+
+## D020 · Own structured citations: block numbers + quote (2026-11-14)
+
+**Decision:** Claude answers with `GroundedAnswer` (answer, `citations: list[Citation]`, `in_course`) through
+`messages.parse()`. Each `Citation` is a context block number (1 to k) plus a short exact quote. My code maps
+the block back to the chunk and moves out-of-range citations to `invalid_citations` (kept, so the eval can count them).
+
+**Alternatives:**
+- Anthropic's built-in Citations feature: needs a different request format and, as far as I know, can't be
+  combined with structured output (`messages.parse`), so it would need a second code path in `llm.py`. Possible
+  comparison later. (To verify in current docs.)
+- Cite `chunk_id` strings: longer, easier for the model to miscopy.
+- Per-claim citations: more precise, more work to build and to eval; one list per answer is enough for
+  session-level citation accuracy.
+
+**Evidence / reasons:**
+- Reuses the existing `llm.ask(output_format=...)` path; build it by hand first (CLAUDE.md).
+- Smoke test: correct citations for an in-course question, correct abstention for an off-topic one.
+
+**Limits:** quotes aren't checked against the chunk text yet; `in_course=False` with citations isn't flagged;
+no measured citation accuracy yet (M5 eval).
+
+**Revisit at:** M5 eval (citation accuracy), M12 (Citations API comparison, optional).
+
+## D021 · Streamlit for the UI now; FastAPI next; Next.js reassessed at M13 (2026-11-14)
+
+**Decision:** The study app is Streamlit calling `answer()` directly. The UI holds no RAG logic: it only calls
+`answer()` and renders the `RagResult`, one `render_...()` function per section, styles in `app/styles.py`.
+FastAPI (`POST /ask` returning `RagResult`) comes next, for learning and for the deploy/second client.
+A Next.js frontend only if Streamlit can't do something I need (expected pressure: agent UI in M8–M10).
+
+**Alternatives:**
+- FastAPI first, Streamlit calling it over HTTP: ~2 extra hours and two processes, with only one client today.
+- Reflex (pasted design brief): full design control but a new framework, ~4–6 h, heavier deploy. Instead the
+  premium look is done by theming Streamlit (`config.toml` + custom CSS).
+
+**Evidence / reasons:**
+- CLAUDE.md: get to a usable M6 before polishing; add a component only with a written reason.
+- `RagResult` is already Pydantic, so the API layer is small and changes nothing in `rag/`.
+
+**Limits:** custom CSS targets Streamlit's internal `data-testid` selectors, which can change on upgrade;
+the rerun model will get awkward for multi-step agent UIs.
+
+**Revisit at:** M8–M10 (agent UI), M13 (deploy / Next.js).
+
+## D022 · Pipeline timing measured in the UI only (2026-11-14)
+
+**Decision:** The pipeline strip shows retrieval time as an estimate (total time measured in the UI minus Claude's
+`latency_s`), and appears after the answer instead of lighting up step by step.
+
+**Alternatives:** split `answer()` into `search()` + `generate_answer()` and add `search_latency_s` to `RagResult`:
+exact numbers and live steps, but changes `rag/` for a UI feature. Rejected for now.
+
+**Limits:** retrieval time is approximate ("~"); `latency_s` in the logs is still Claude-only.
+
+**Revisit at:** M7 (retrieval changes will need exact search latency for before/after numbers).
