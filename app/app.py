@@ -152,7 +152,7 @@ def main() -> None:
         """
         <div class="hero">
           <h1>VivaPrep <span class="accent">AI</span></h1>
-          <p>Ask anything about the course. Every answer cites the lesson it came from.</p>
+          <p>A RAG-powered AI tutor for self-learners.</p>
         </div>
         """,
         unsafe_allow_html=True,
