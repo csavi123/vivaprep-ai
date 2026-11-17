@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TutorAnswer(BaseModel):
@@ -45,3 +45,15 @@ class RagResult(BaseModel):
     invalid_citations: list[Citation]      # citations to a block number that wasn't in the context
     cost_usd: float                        # from llm.ask(), for cost tracking
     latency_s: float                       # from llm.ask(), for latency tracking
+
+
+class AskRequest(BaseModel):
+    # The JSON body a client sends to POST /ask (the API's INPUT; RagResult is its OUTPUT).
+    # FastAPI validates it before our code runs: a bad request gets a 422 and never costs a Claude call.
+
+    # Remove spaces at the start and end first, so "   " becomes "" and fails min_length below
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    # min_length=3: no empty or one-letter questions (the UI checks this too, but the API can't trust its clients)
+    # max_length=1000: caps the cost of one call; a real study question is well under 1000 characters
+    question: str = Field(min_length=3, max_length=1000)
