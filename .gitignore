@@ -8,6 +8,7 @@ data/
 evals/datasets/
 evals/reports/
 evals/reports
+.DS_Store
 
 # Browser login session (TAI Labs cookies) - never commit
 auth.json
