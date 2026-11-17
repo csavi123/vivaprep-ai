@@ -17,6 +17,12 @@ MAX_ATTEMPTS = 3
 BASE_DELAY_S = 1.0
 RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504, 529}
 
+# Haiku 5.5 thinks before answering by default (hidden, but billed as output tokens),
+# and thinking + answer share max_tokens. 1024 cut off long answers mid-JSON (s3-03, 2026-11-16).
+# max_tokens is a ceiling, not a cost: you pay only for the tokens actually used.
+# ~16000 is the docs' suggested default for non-streaming calls (higher risks HTTP timeouts).
+DEFAULT_MAX_TOKENS = 16000
+
 def log_call(model: str, result: LLMResult) -> None:
     record = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -34,7 +40,7 @@ def log_call(model: str, result: LLMResult) -> None:
 
 
 
-def ask(prompt: str, model: str="claude-haiku-5-5", max_tokens: int=1024,output_format: type[BaseModel] | None = None)->LLMResult:
+def ask(prompt: str, model: str="claude-haiku-5-5", max_tokens: int=DEFAULT_MAX_TOKENS,output_format: type[BaseModel] | None = None)->LLMResult:
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
             start_time=time.perf_counter()
