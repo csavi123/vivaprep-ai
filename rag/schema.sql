@@ -15,8 +15,12 @@ CREATE TABLE IF NOT EXISTS chunks (
     heading_path  TEXT   NOT NULL,
     text          TEXT   NOT NULL,
     tokens_est    INT    NOT NULL,
-    embedding     VECTOR(1024) NOT NULL      -- Voyage voyage-4-lite: 1024 numbers
+    embedding     VECTOR(1024) NOT NULL      -- BGE-M3: 1024 numbers
 );
 
 -- 3. The vector index, for fast cosine-similarity search
 CREATE INDEX IF NOT EXISTS chunks_embedding_idx ON chunks USING hnsw (embedding vector_cosine_ops);
+
+-- 4. Lock the table against Supabase's Data API (no policies = no rows via REST).
+--    Our app connects as the table owner, which RLS doesn't restrict.
+ALTER TABLE chunks ENABLE ROW LEVEL SECURITY;
