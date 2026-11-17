@@ -1,38 +1,92 @@
 """Streamlit study app for the course tutor (M6).
 
-Run from the repo root (the -m puts the repo root on Python's path, so `from rag...` works):
+The UI is a thin client: it sends the question to the FastAPI backend (api/main.py)
+and draws the RagResult it gets back. BGE-M3, Postgres and Claude all live behind the API.
+
+Run from the repo root, in two terminals (the -m puts the repo root on Python's path, so `from schemas...` works):
+    uvicorn api.main:app --host 127.0.0.1 --port 8000
     python -m streamlit run app/app.py
 
 Design rules (so add-ons don't break things):
-1. No RAG logic here: only call answer() and display the RagResult.
+1. No RAG logic here: only call the API and display the RagResult.
 2. One render_...() function per screen section.
 3. Expensive things in @st.cache_resource; per-user things in st.session_state.
-4. Call Claude only when the form is submitted (each call costs money).
-5. Wrap answer() in try/except and show st.error, so a failure doesn't crash the page.
+4. Call the API only when the form is submitted (each answer costs a Claude call).
+5. Every API failure becomes a clear st.error message, never a crashed page or a raw traceback.
 """
 
 import html
+import os
 import time
 
+import dotenv
+import httpx
 import streamlit as st
 
-from rag.answer import answer
-from rag.embeddings import load_model
 from schemas import RagResult
 # Streamlit puts this script's folder (app/) on Python's path, so styles.py is imported by its plain name.
 # ("from app.styles" would fail: "app" would resolve to this file, app/app.py, not the folder.)
 from styles import apply_styles
 
-TOP_K = 5                              # how many chunks to retrieve per question
+# Decision #1: app.py no longer imports rag/ or llm.py, so nothing loads .env for us by accident anymore.
+# Load it here ourselves. (In the container there is no .env: the HF Secrets are already in the environment, and they win.)
+dotenv.load_dotenv()
+
 APP_TITLE = "VivaPrep AI"
 CLAUDE_MODEL_LABEL = "Claude Haiku"    # display only; the real model ID is the default in llm.ask()
+DEFAULT_API_URL = "http://127.0.0.1:8000"   # the API runs next to the UI: locally and inside the container
+
+# Decision #4: how long to wait for the API.
+# connect=5: the API is on the same machine, so if it doesn't accept the connection in 5 s it isn't running.
+# read=120: a normal answer takes ~2-5 s, but llm.py may retry up to 3 times with backoff, and
+# max_tokens=16000 allows a long answer. Too short -> we give up on answers that were about to arrive
+# (and still pay for them). Too long -> the user stares at a spinner for minutes when something is stuck.
+API_TIMEOUT = httpx.Timeout(120.0, connect=5.0)
 
 
-@st.cache_resource          # run once, then reuse the same object on every rerun (and for every browser tab)
-def get_embedding_model():
-    """Load BGE-M3 once. Without the cache, every click would reload it (several seconds, ~2 GB of RAM)."""
-    print("loading BGE-M3")    # goes to the terminal; it should appear only once per server start
-    return load_model()
+class ApiError(Exception):
+    """A failed API call, with a message that is safe and useful to show the user."""
+
+
+def get_api_token() -> str:
+    """The shared secret the API expects in X-API-Token ("" if it isn't set)."""
+    # Read when needed, not at import time (the Step 2 lesson)
+    return os.environ.get("API_TOKEN", "").strip()
+
+
+def call_api(question: str) -> RagResult:
+    """Send the question to POST /ask and turn the JSON answer back into a RagResult.
+
+    Raises ApiError with a user-friendly message for every kind of failure.
+    """
+    api_url = os.environ.get("API_URL", DEFAULT_API_URL)
+    try:
+        response = httpx.post(
+            api_url + "/ask",
+            json={"question": question},                  # becomes the AskRequest body
+            headers={"X-API-Token": get_api_token()},
+            timeout=API_TIMEOUT,
+        )
+    except httpx.ConnectError:
+        raise ApiError("The tutor's backend isn't running. Start it with: uvicorn api.main:app --port 8000")
+    except httpx.TimeoutException:
+        raise ApiError("The tutor took too long to answer. Please try again.")
+
+    if response.status_code == 401:
+        # Not the user's fault: the UI and the API have different API_TOKEN values (a config problem)
+        raise ApiError("The app isn't configured correctly (API token rejected).")
+    if response.status_code == 422:
+        # The API's validation message, e.g. "String should have at least 3 characters"
+        message = response.json()["detail"][0]["msg"]
+        raise ApiError(f"That question can't be sent: {message}")
+    if response.status_code != 200:
+        # 502 and anything else: the API already made the message safe, so show its detail
+        detail = response.json().get("detail", "Unknown error")
+        raise ApiError(f"Something went wrong: {detail}")
+
+    # The JSON has exactly RagResult's fields, so this rebuilds the same object answer() used to return.
+    # The render_...() functions below don't need to change at all.
+    return RagResult.model_validate(response.json())
 
 
 def render_answer(rag: RagResult) -> None:
@@ -158,9 +212,11 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    # Load the model when the page opens, so the first question isn't slow too (cached: only the first visit waits)
-    with st.spinner("Loading the embedding model..."):
-        model = get_embedding_model()
+    # Decision #2: without a token every request would get a 401, so stop here with a clear message
+    # (the UI's version of the API refusing to start without API_TOKEN)
+    if get_api_token() == "":
+        st.error("API_TOKEN is not set. Add it to .env (locally) or to the Space secrets (on Hugging Face).")
+        st.stop()                           # nothing below this line runs
 
     # A form: the code below only gets submitted=True when Ask is clicked (each answer costs a Claude call)
     with st.form("ask_form"):
@@ -176,11 +232,16 @@ def main() -> None:
     try:
         with st.spinner("Searching the course and asking Claude..."):
             start_time = time.perf_counter()
-            rag = answer(question, k=TOP_K, model=model)
-            total_s = time.perf_counter() - start_time    # search + Claude, measured here in the UI
+            rag = call_api(question)
+            total_s = time.perf_counter() - start_time    # HTTP + search + Claude, measured here in the UI
+    except ApiError as e:
+        st.error(str(e))                    # already a friendly, safe message
+        return
     except Exception as e:
-        # Docker down, API error, no structured answer...: show it instead of crashing the page
-        st.error(f"Something went wrong: {e}")
+        # Anything we didn't plan for (e.g. the API sent back something that isn't valid JSON):
+        # details to the terminal for me, a short message for the user
+        print(f"Unexpected error calling the API: {e!r}")
+        st.error("Something unexpected went wrong. Please try again.")
         return
 
     render_pipeline(rag, total_s)

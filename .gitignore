@@ -12,3 +12,6 @@ evals/reports
 
 # Browser login session (TAI Labs cookies) - never commit
 auth.json
+
+# Personal demo/interview notes - kept local only
+docs/DEMO_NOTES.md
