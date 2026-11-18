@@ -46,11 +46,11 @@ def format_context(chunks: list[dict]) -> str:
     return "\n\n".join(blocks)
 
 
-def answer(question: str, k: int = 5, model=None) -> RagResult:
+def answer(question: str, k: int = 5, model=None, session: int | None = None) -> RagResult:
     """Retrieve k chunks, ask Claude to answer from them, and check the citations."""
     # 1. Retrieve: the k chunks closest in meaning to the question
     #    (model= is the BGE-M3 embedding model; pass it in when answering many questions, it's slow to load)
-    chunks = search(question, k=k, model=model)
+    chunks = search(question, k=k, model=model, session=session)
 
     # 2. Format the chunks as numbered blocks
     context = format_context(chunks)

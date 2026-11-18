@@ -21,6 +21,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 
 from rag.answer import answer
 from rag.embeddings import load_model
+from rag.search import list_sessions
 from schemas import AskRequest, RagResult
 
 # Load .env first, before anything reads the environment (the Step 2 lesson).
@@ -90,9 +91,23 @@ def ask_endpoint(request: AskRequest) -> RagResult:
     # By the time we get here, FastAPI has already checked the token (check_token)
     # and the body (AskRequest: 3 to 1000 characters). Bad requests never reach this line.
     try:
-        return answer(request.question, k=TOP_K, model=state["model"])
+        return answer(request.question, k=TOP_K, model=state["model"], session=request.session)
     except Exception:
         # logger.exception writes the full traceback to the server log (for me),
         # but the client only gets a short message: no internal details, paths, or config.
         logger.exception("answer() failed")
         raise HTTPException(status_code=502, detail="The tutor couldn't answer right now. Please try again.")
+
+
+# `def`, not `async def`: list_sessions() waits on Postgres, the same reason as /ask above.
+# Token required: the titles come from the TAI Labs course and the call hits the database,
+# so it is protected like /ask, not public like /health.
+@app.get("/sessions", dependencies=[Depends(check_token)])
+def sessions_endpoint() -> list[dict]:
+    """Every session once, in order, for the UI dropdown: [{"session": 1, "title": "..."}, ...]."""
+    try:
+        return list_sessions()
+    except Exception:
+        # Same rule as /ask: full details to the server log, a short safe message to the client
+        logger.exception("list_sessions() failed")
+        raise HTTPException(status_code=502, detail="Couldn't load the session list right now. Please try again.")

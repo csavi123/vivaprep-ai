@@ -57,3 +57,9 @@ class AskRequest(BaseModel):
     # min_length=3: no empty or one-letter questions (the UI checks this too, but the API can't trust its clients)
     # max_length=1000: caps the cost of one call; a real study question is well under 1000 characters
     question: str = Field(min_length=3, max_length=1000)
+
+    # session: search only this session's chunks. Optional: None (or not sent) = search all sessions,
+    # so clients that never send it (the current UI, the evals) keep working.
+    # ge=1: sessions start at 1, so 0 or negatives get a 422 before any search or Claude call.
+    # No le= (upper limit): a new session in the database shouldn't need a code change here.
+    session: int | None = Field(default=None, ge=1)
