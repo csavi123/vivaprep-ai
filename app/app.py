@@ -54,16 +54,18 @@ def get_api_token() -> str:
     return os.environ.get("API_TOKEN", "").strip()
 
 
-def call_api(question: str) -> RagResult:
+def call_api(question: str, session: int | None = None) -> RagResult:
     """Send the question to POST /ask and turn the JSON answer back into a RagResult.
 
+    session=None searches all sessions; session=1 searches only session 1.
     Raises ApiError with a user-friendly message for every kind of failure.
     """
     api_url = os.environ.get("API_URL", DEFAULT_API_URL)
     try:
         response = httpx.post(
             api_url + "/ask",
-            json={"question": question},                  # becomes the AskRequest body
+            # becomes the AskRequest body; None is sent as JSON null, which AskRequest reads as "all sessions"
+            json={"question": question, "session": session},
             headers={"X-API-Token": get_api_token()},
             timeout=API_TIMEOUT,
         )
@@ -87,6 +89,41 @@ def call_api(question: str) -> RagResult:
     # The JSON has exactly RagResult's fields, so this rebuilds the same object answer() used to return.
     # The render_...() functions below don't need to change at all.
     return RagResult.model_validate(response.json())
+
+
+# Streamlit reruns this whole script on every click. Without the cache, every click would call
+# GET /sessions (and Postgres) again for a list that almost never changes.
+# ttl=600: keep the result for 10 minutes, so a newly added session shows up without restarting the app.
+# If the function raises, nothing is cached, so a failed call is simply tried again on the next rerun.
+@st.cache_data(ttl=600)
+def fetch_sessions() -> list[dict]:
+    """Get the session list from GET /sessions: [{"session": 1, "title": "..."}, ...].
+
+    Raises ApiError if the list can't be loaded.
+    """
+    api_url = os.environ.get("API_URL", DEFAULT_API_URL)
+    try:
+        response = httpx.get(
+            api_url + "/sessions",
+            headers={"X-API-Token": get_api_token()},
+            timeout=API_TIMEOUT,
+        )
+    except httpx.HTTPError:
+        # ConnectError, TimeoutException, ...: all mean "couldn't reach the API"
+        raise ApiError("Couldn't load the session list (the backend isn't reachable).")
+
+    if response.status_code != 200:
+        raise ApiError(f"Couldn't load the session list (status {response.status_code}).")
+    return response.json()
+
+
+def build_session_labels(sessions: list[dict]) -> dict:
+    """Map each dropdown value to the text shown for it: {None: "All sessions", 1: "Session 1: ...", ...}."""
+    labels = {None: "All sessions"}          # first entry = the default choice
+    for entry in sessions:
+        number = entry["session"]
+        labels[number] = f"Session {number}: {entry['title']}"
+    return labels
 
 
 def render_answer(rag: RagResult) -> None:
@@ -218,8 +255,24 @@ def main() -> None:
         st.error("API_TOKEN is not set. Add it to .env (locally) or to the Space secrets (on Hugging Face).")
         st.stop()                           # nothing below this line runs
 
+    # The session list for the dropdown. If it can't be loaded, don't block the app:
+    # "All sessions" still works (it doesn't need the list), so show a warning and carry on.
+    try:
+        sessions = fetch_sessions()
+    except ApiError as e:
+        st.warning(f"{e} You can still ask about all sessions.")
+        sessions = []
+    labels = build_session_labels(sessions)
+
     # A form: the code below only gets submitted=True when Ask is clicked (each answer costs a Claude call)
     with st.form("ask_form"):
+        # The options are the VALUES we want back (None, 1, 2, ...); format_func turns each into its label.
+        # So `session` is already None or an int, exactly what the API expects, with no converting back from text.
+        session = st.selectbox(
+            "Session",
+            list(labels.keys()),
+            format_func=lambda value: labels[value],
+        )
         question = st.text_input("Your question")
         submitted = st.form_submit_button("Ask")
 
@@ -232,7 +285,7 @@ def main() -> None:
     try:
         with st.spinner("Searching the course and asking Claude..."):
             start_time = time.perf_counter()
-            rag = call_api(question)
+            rag = call_api(question, session=session)
             total_s = time.perf_counter() - start_time    # HTTP + search + Claude, measured here in the UI
     except ApiError as e:
         st.error(str(e))                    # already a friendly, safe message
