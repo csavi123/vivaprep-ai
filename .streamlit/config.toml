@@ -11,3 +11,4 @@ font = "sans serif"                    # Inter itself is loaded in app/styles.py
 
 [client]
 toolbarMode = "minimal"                # hide developer menu items (including the "Deploy" button)
+showErrorDetails = false               # never show tracebacks in the browser (they still go to the terminal / Space logs)

@@ -1,0 +1,22 @@
+# Secrets: must never be inside the image
+.env
+.env.*
+auth.json
+
+# Course content and local state
+data/
+logs/
+
+# Not needed at runtime
+.venv/
+__pycache__/
+.pytest_cache/
+.git/
+.vscode/
+evals/
+tests/
+ingest/
+agents/
+docs/
+*.ipynb
+.DS_Store

@@ -1,0 +1,13 @@
+# Runtime deps for the Docker image only (API + UI). torch is installed separately (CPU-only) in the Dockerfile.
+anthropic==2.7.0
+fastapi==0.163.1
+httpx==0.28.1
+numpy==2.5.4
+pgvector==0.5.1
+psycopg==3.3.8
+psycopg-binary==3.3.8
+pydantic==2.14.3
+python-dotenv==1.2.4
+sentence-transformers==6.3.0
+streamlit==1.67.0
+uvicorn==0.54.0
