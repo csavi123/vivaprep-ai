@@ -27,6 +27,22 @@ def load_model() -> SentenceTransformer:
     return SentenceTransformer(MODEL_NAME, revision=MODEL_REVISION, device=device)
 
 
+# The one copy of BGE-M3 shared by everything in this process (API and agent tools). None = not loaded yet.
+_shared_model = None
+
+
+def get_shared_model() -> SentenceTransformer:
+    """Load BGE-M3 on the first call, then return that same copy to every later caller.
+
+    Why: the API (lifespan) and the agent's search_course tool both need the model.
+    If each called load_model(), the API process would hold two ~2 GB copies.
+    """
+    global _shared_model             # assign to the module-level variable above, not a new local one
+    if _shared_model is None:        # first call in this process: load it (slow)
+        _shared_model = load_model()
+    return _shared_model             # every later call: the copy already in memory (instant)
+
+
 def count_tokens(model: SentenceTransformer, text: str) -> int:
     """The real token count, using the model's own tokenizer (not the chars/4 estimate)."""
     return len(model.tokenizer(text)["input_ids"])

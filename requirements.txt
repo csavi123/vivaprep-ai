@@ -10,6 +10,8 @@ anthropic==2.7.0
 anyio==4.16.0
 attrs==26.1.0
 Authlib==1.9.9
+# av 19 removed av.open(metadata_errors=...), which faster-whisper 1.2.1 still calls: keep av at 18.x
+av==18.1.0
 beautifulsoup4==4.15.0
 certifi==2026.10.23
 cffi==2.1.1
@@ -17,10 +19,13 @@ charset-normalizer==3.5.2
 click==8.5.1
 cloudpickle==3.1.2
 cryptography==50.0.2
+ctranslate2==4.9.0
 distro==1.9.0
 docstring_parser==0.18.0
 fastapi==0.163.1
+faster-whisper==1.2.1
 filelock==4.2.10
+flatbuffers==25.12.19
 frozenlist==1.8.0
 fsspec==2026.9.0
 google-adk==2.14.1
@@ -59,6 +64,7 @@ multidict==7.2.1
 narwhals==2.28.0
 networkx==3.7
 numpy==2.5.4
+onnxruntime==1.32.0
 opentelemetry-api==1.45.2
 opentelemetry-sdk==1.45.2
 opentelemetry-semantic-conventions==0.66b2

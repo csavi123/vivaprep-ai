@@ -41,7 +41,13 @@ SELECT DISTINCT session, title
 FROM chunks
 ORDER BY session
 """
-
+# Every chunk of one session, in reading order (for quizzes and session overviews).
+SESSION_CHUNKS_SQL = """
+SELECT chunk_id, session, heading_path, text
+FROM chunks
+WHERE session = %s
+ORDER BY chunk_id
+"""
 
 def search(question: str, k: int = 5, model=None, session: int | None = None) -> list[dict]:
     """Return the k chunks closest in meaning to the question, best first.
@@ -90,6 +96,16 @@ def list_sessions() -> list[dict]:
         sessions.append({"session": session, "title": title})
     return sessions
 
+def get_session_chunks(session: int) -> list[dict]:
+    """It returns every chunk of one session in reading order"""
+    load_dotenv(".env")             # for DATABASE_URL
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        rows = conn.execute(SESSION_CHUNKS_SQL, (session,)).fetchall()
+    chunks = []
+    for row in rows:
+        chunk_id,session_of_chunk, heading_path, text  = row
+        chunks.append({"chunk_id": chunk_id, "session": session_of_chunk, "heading_path":heading_path, "text":text})
+    return chunks
 
 def main() -> None:
     # sys.argv = ['rag/search.py', 'your question', optional session number]

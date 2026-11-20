@@ -83,6 +83,42 @@ h1, h2, h3 { font-family: var(--font); letter-spacing: -0.02em; color: var(--tex
 }
 .hero p { color: var(--text-muted); font-size: 1rem; margin: 0 0 2rem 0; }
 
+/* ---- Mode tabs (Ask / Tutor / Quiz): the main navigation, styled as a segmented control ----
+   Uses role= selectors (standard HTML accessibility attributes) rather than Streamlit's class names,
+   so they're less likely to break on a Streamlit upgrade. */
+[data-testid="stTabs"] [role="tablist"] {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));   /* three equal segments */
+  gap: 0.35rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0.35rem;
+}
+[data-testid="stTabs"] [role="tab"] {
+  justify-content: center;
+  height: auto;
+  padding: 0.6rem 0.75rem;
+  margin: 0;
+  border-radius: 10px;
+  color: var(--text-muted);
+  background: transparent;
+  transition: background var(--transition), color var(--transition);
+}
+[data-testid="stTabs"] [role="tab"] p { font-size: 0.95rem; font-weight: 600; }
+[data-testid="stTabs"] [role="tab"]:hover { color: var(--text); background: rgba(255, 255, 255, 0.04); }
+/* The open tab: a soft violet tint, not the full gradient (that stays reserved for the submit buttons) */
+[data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+  color: var(--text);
+  background: rgba(124, 108, 246, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(124, 108, 246, 0.45);
+}
+/* Hide Streamlit's own underline: the tinted segment already shows which tab is open.
+   In Streamlit 1.67 it's the tab bar's ::after (a 2px bar that slides under the open tab). */
+[data-testid="stTabs"] [role="tablist"]::after { display: none; }
+/* The one-line hint at the top of each tab */
+.mode-hint { color: var(--text-muted); font-size: 0.9rem; margin: 0.25rem 0 0.5rem 0; }
+
 /* ---- Cards: the question form, bordered containers, expanders ---- */
 [data-testid="stForm"],
 [data-testid="stVerticalBlockBorderWrapper"],

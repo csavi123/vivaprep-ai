@@ -19,6 +19,7 @@ Rules:
 1. Use only information from the context blocks. Do not add facts from your own knowledge.
 2. For every block you used, add a citation with its block number and a short quote copied exactly from that block.
 3. If the context blocks do not contain the answer, set in_course to false, say briefly that the course material does not cover it, and leave citations empty.
+4. Write the answer in markdown, in simple terms: one short intro sentence, then the key points as a short bulleted list with the important words in **bold**. Add a short example from the context when it helps. Do not put block numbers or citations in the answer text: they go only in citations.
 
 <context>
 {context}
