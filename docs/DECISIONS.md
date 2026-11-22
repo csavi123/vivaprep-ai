@@ -387,3 +387,29 @@ exact numbers and live steps, but changes `rag/` for a UI feature. Rejected for 
 **Limits:** retrieval time is approximate ("~"); `latency_s` in the logs is still Claude-only.
 
 **Revisit at:** M7 (retrieval changes will need exact search latency for before/after numbers).
+
+## D023 · Baseline: closed-book vs RAG on session01, 3 runs each (2026-11-21)
+
+**Numbers (25 questions, same judge)**
+- Closed-book: 0.80 / 0.81 / 0.75 → mean 0.79, range 0.75–0.81
+- RAG:         0.73 / 0.71 / 0.79 → mean 0.74, range 0.71–0.79
+- RAG when retrieval found session 1: 0.90 (19 q) · when it didn't: 0.24 (6 q)
+- Quote accuracy 100% in all runs; retrieval hit 19/25 every run (search is deterministic)
+
+**What it means**
+- Ranges overlap, so RAG vs closed-book is a tie on this set (the 0.05 gap is within run-to-run noise)
+- Error analysis of the 6 misses: 3 wording mismatches (s1-03, s3-02, s4-02), 3 label too strict (s2-04, s3-04, s4-03)
+- Counting the label cases as correct, retrieval finds a right lesson for 22/25 (88%)
+- The bottleneck is retrieval: when it works, answers score 0.90
+- Closed-book is high (0.79) because session 1 is general LLM knowledge Haiku already has;
+  RAG wins on course-specific questions (s2-05, s5-03: 0/3 closed-book → 3/3 RAG)
+
+**Decision**
+- Report every eval as mean + range over 3 runs, never one run
+- Next: Phase 2 (validate the judge), then allow multiple correct sessions per question,
+  then fix wording mismatches in M7 (hybrid search / reranker)
+
+**Didn't help / surprises**
+- Same answer, different verdict (s1-01: ❌ ✅ ❌) → the judge is noisy too → Phase 2
+- RAG answers flip less between runs (4 of 25) than closed-book answers (~9 of 25)
+- run_evals.py saves no report, so the closed-book score can't be split the same way → make it save one

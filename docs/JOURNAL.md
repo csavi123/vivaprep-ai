@@ -269,3 +269,48 @@ So judge() is the messenger. It packages up the question, the answer and the che
 - Check the new UI, record a 20–30 s demo, LinkedIn post (only measured numbers)
 - FastAPI `POST /ask` → Supabase (re-run retrieval eval) → deploy (private HF Space, spend limit)
 - Back to the M5 eval
+
+## 2026-11-21 · Eval phase 1: 3-run baseline, closed-book vs RAG, error analysis
+
+**Built**
+- Eval plan (6 phases): baselines → judge validation → coverage gaps (abstention, quiz, agent, red-team) →
+  Langfuse + Ragas as a cross-check → CI → `docs/EVALS.md`. Own harness stays the source of truth
+- `evals/run_rag_evals.py`: report name now unique per run (`datetime.now().strftime('%Y-%m-%d_%H%M%S')`);
+  before, every run on the same day overwrote the last one
+- Ran closed-book (`run_evals.py`) and RAG (`run_rag_evals.py`) 3× each on `session01.jsonl`
+- Error analysis of the 6 retrieval misses; D023
+
+**Learned**
+- One eval run is one sample: the same setup scored 0.71–0.79. Never trust a single run; report mean + range
+- Two sources of noise: the answer model AND the judge. Same answer (s1-01) was marked ❌ ✅ ❌
+- A stable average can hide unstable questions: 0.80 → 0.81 but 6 of 25 questions changed
+- Search is deterministic (19/25 every run); all variance comes from the two Claude calls
+- Splitting the score shows the bottleneck: 0.90 when retrieval hit, 0.24 when it missed
+- Error analysis = read each failure and name the cause. Half the "misses" were the label being too strict
+- Closed-book is a baseline: it shows what RAG adds. Session 1 is general LLM knowledge, so Haiku already knows most of it
+- `datetime` is both a module and a class; with `from datetime import datetime`, call `datetime.now()`;
+  `{datetime}` in an f-string prints the class, not the time. `%m` = month, `%M` = minute
+- Build output file names at the start of a paid run (a crash at the end loses everything)
+
+**Confused me**
+- `s1`–`s5` in `session01.jsonl` IDs are sections of session 1, not sessions 1–5 → use `sess07-q03` style IDs in rag_v1
+- Why only one chunk was cited in the app: cite = used, retrieve = fetched; uncited chunks are expected
+- The eval as a whole felt like too much at once; the open-book exam analogy helped
+  (find the page → write the answer → mark it)
+
+**Numbers**
+- Closed-book: 0.80 / 0.81 / 0.75 → mean 0.79 · RAG: 0.73 / 0.71 / 0.79 → mean 0.74 (ranges overlap = tie)
+- RAG: quote accuracy 100% (3/3 runs), citation accuracy 78–80% (strict), retrieval hit 19/25, abstained 3/25,
+  uncited 0/25, ~$0.018 per run (answers only), 3.2–3.7 s avg latency
+- Retrieval misses: 3 wording mismatch (s1-03, s3-02, s4-02), 3 label too strict (s2-04, s3-04, s4-03) → 22/25 real hit
+- RAG beats closed-book on course-specific questions (s2-05, s5-03: 0/3 → 3/3)
+
+**Still open**
+- `run_evals.py` saves no report and has no guard for a failed judge call
+- Judge prompt says nothing about "implied but not stated" concepts (where most flips happen)
+- Judge cost isn't included in the printed RAG cost; `llm.py` prices still unchecked
+- Agent tutor latency not measured; possible unsupported claims in answers (faithfulness, Phase 4)
+
+**Next**
+- Phase 2: hand-label ~50 (concept, answer) pairs, starting with s1-01, s1-03, s1-04, s3-02, s3-05, s4-01, s4-04
+- Then 1d: `rag_v1.jsonl` across all 17 sessions (generated from chunks with Sonnet, reviewed by hand)
