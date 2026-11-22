@@ -15,7 +15,7 @@ Run from the repo root:
 """
 
 import json
-from datetime import date
+from datetime import datetime
 from pathlib import Path
 
 from evals.run_evals import load_cases, judge   # one judge for both runs: a fair comparison
@@ -237,7 +237,7 @@ if __name__ == "__main__":
 
     # 8. Save to a file (evals/reports/ is git-ignored: it contains course text)
     REPORTS_DIR.mkdir(exist_ok=True)
-    report_file = REPORTS_DIR / f"rag_session01_{date.today()}.jsonl"
+    report_file = REPORTS_DIR / f"rag_session01_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}.jsonl"
     with report_file.open("w", encoding="utf-8") as f:
         for record in records:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
