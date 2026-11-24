@@ -22,6 +22,11 @@ For EACH key concept, decide whether the student's answer covers it.
 - If the answer says something that contradicts the concept, it is not covered.
 Return one verdict per key concept, in the same order, with a one-sentence reason."""
 
+# Judge prompts by name, for evals/rejudge.py. A rubric-based v2 was tried and dropped (D024):
+# no better than v1 on 73 hand labels (kappa 0.74 vs 0.79). Its rules are in evals/judge_rubric.md.
+JUDGE_PROMPTS = {"v1": JUDGE_PROMPT}
+
+
 def load_cases(path: Path) -> list[dict]:
     cases= []
     with open(path) as f:
@@ -33,9 +38,10 @@ def load_cases(path: Path) -> list[dict]:
 
 
 
-def judge(case: dict, answer_text: str) -> JudgeVerdict:
+def judge(case: dict, answer_text: str, prompt_template: str = JUDGE_PROMPT) -> JudgeVerdict:
+    # prompt_template defaults to v1, so run_evals.py and run_rag_evals.py don't change until I decide
     concepts = "\n".join(f"- {c}" for c in case["key_concepts"])
-    prompt = JUDGE_PROMPT.format(
+    prompt = prompt_template.format(
         question=case["question"],
         answer=answer_text,
         concepts=concepts,
