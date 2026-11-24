@@ -413,3 +413,39 @@ exact numbers and live steps, but changes `rag/` for a UI feature. Rejected for 
 - Same answer, different verdict (s1-01: ❌ ✅ ❌) → the judge is noisy too → Phase 2
 - RAG answers flip less between runs (4 of 25) than closed-book answers (~9 of 25)
 - run_evals.py saves no report, so the closed-book score can't be split the same way → make it save one
+
+## D024 · Validate the LLM judge against my own labels; keep the v1 prompt (2026-11-23)
+
+**Setup:** 25 RAG answers frozen from one report (`rag_session01_2026-11-21_191338`) → 73 (answer, key concept)
+rows. I labelled every row blind (judge's verdict hidden) using `evals/judge_rubric.md`.
+Tools: `build_label_sheet.py`, `judge_agreement.py` (agreement, TPR, TNR, Cohen's kappa), `rejudge.py`.
+
+**Numbers**
+| | Agreement | TPR | TNR | Kappa | Too strict | Too lenient |
+|---|---|---|---|---|---|---|
+| My first labels vs judge | 0.86 | 0.94 | 0.65 | 0.63 | 3 | 7 |
+| After adjudication (4 of my labels fixed) | 0.92 | 0.95 | 0.81 | 0.76 | 3 | 3 |
+| v1 prompt, re-judged 3× (frozen answers) | 0.92–0.93 | 0.95–0.96 | 0.81–0.88 | 0.76–0.80 | 2–3 | 2–3 |
+| v2 prompt (+ rubric), re-judged 3× | 0.90–0.92 | 0.95 | 0.75–0.81 | 0.71–0.76 | 3 | 3–4 |
+
+- Judge self-consistency on frozen answers: 2 of 73 rows flipped across 3 runs (3%), for both prompts
+- Cost: ~164 judge calls ≈ $0.04 (llm.py prices, still unchecked)
+
+**Decision:** Trust the v1 judge (agreement ~0.93, kappa ~0.79). Keep the v1 prompt; v2 dropped.
+
+**Alternatives tried:**
+- v2 prompt = v1 + my 6 rubric rules. No better (kappa 0.74 vs 0.79, ranges touch) and did not fix the 3
+  "too strict" rows it was written for. Reverted.
+
+**Evidence / what I learned:**
+- Adjudication: 4 of the judge's 7 "lenient" errors were mine. I'd marked s2-04 and s3-04 "no" because the
+  answer came from another session; that's the citation check's job, not the coverage judge's.
+- Phase 1 noise came mostly from the tutor's answers changing, not from the judge (3% judge flips).
+- The remaining disagreements are the same rows in every run and for both prompts (s3-05#1, s4-03#1,
+  s4-04#0 strict; s2-06#2, s4-04#2 lenient): systematic, not random. Their key concepts are vaguely
+  worded ("small changes genuinely change the numbers", "the whole sequence is the input").
+
+**Limits:** one labeller (me), 73 rows, RAG answers on session 1 only; closed-book answers ("I don't have the
+lesson…") not checked.
+
+**Revisit at:** 1d `rag_v1` (write clearer key concepts), M12 (~100 labels, second labeller, Sonnet as judge).

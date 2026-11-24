@@ -314,3 +314,47 @@ So judge() is the messenger. It packages up the question, the answer and the che
 **Next**
 - Phase 2: hand-label ~50 (concept, answer) pairs, starting with s1-01, s1-03, s1-04, s3-02, s3-05, s4-01, s4-04
 - Then 1d: `rag_v1.jsonl` across all 17 sessions (generated from chunks with Sonnet, reviewed by hand)
+
+## 2026-11-23 · Eval phase 2: validate the judge
+
+**Built**
+- `evals/judge_rubric.md`: 6 rules + a tie-break test for borderline key concepts
+- `evals/build_label_sheet.py`: one row per (answer, key concept), judge's verdict left out (blind labelling);
+  refuses to overwrite
+- `evals/judge_agreement.py`: confusion matrix, agreement, TPR, TNR, Cohen's kappa, list of disagreements;
+  several reports → one line each. `tests/test_judge_agreement.py` (3 tests, hand-worked example)
+- `evals/rejudge.py`: re-judges the same frozen answers with a chosen prompt, N runs, progress per question
+- `judge()` takes an optional `prompt_template` (default v1); D024
+
+**Learned**
+- Phase 2 checks the judge, not the student: I'm the reference, the judge is what's being measured
+- Each row asks one thing: is THIS concept in THIS answer? Not "is the answer right?"
+- Blind labelling: if I see the judge's mark, I'll tend to agree with it
+- Kappa removes luck: I said yes 73% of the time, so an always-yes judge would agree 73% for free
+- TPR low = judge too strict; TNR low = judge too lenient
+- Adjudication: when we disagree, I'm not automatically right. 4 of 7 "judge errors" were mine
+- Freeze the answers to measure the judge alone; change one thing (the prompt), keep or revert
+- A negative result is a result: v2 didn't help, so it's reverted and logged
+- Same disagreements every run = systematic → look at the data (vague concepts), not the prompt
+- Slow scripts need progress output, or slow looks like stuck (my Ctrl+C → KeyboardInterrupt)
+
+**Confused me**
+- What the question / answer / key concepts columns are (exam analogy: question, answer sheet, marking scheme)
+- The two "6"s: 6 retrieval misses (phase 1) vs 6 rubric rules (phase 2)
+- "Input / Output / Nothing is stored" in the answer column: that's the tutor's Markdown answer, not sheet data
+- Marked "no" when the answer came from another session; that's a different check
+
+**Numbers**
+- 73 rows; my labels 53 yes / 20 no → 57 / 16 after adjudication
+- Agreement 0.86 → 0.92, kappa 0.63 → 0.76 after adjudication
+- v1 re-judged 3×: agreement 0.92–0.93, kappa 0.76–0.80; v2: 0.90–0.92, kappa 0.71–0.76
+- Judge flips on frozen answers: 2/73 (3%); ~164 judge calls ≈ $0.04
+
+**Still open**
+- Rubric examples quote session 1 concepts; make them generic before the repo goes public
+- `run_evals.py` (closed-book) still saves no report
+- Vague key concepts in `session01.jsonl` (frozen; fix in rag_v1)
+
+**Next**
+- 1d: `rag_v1.jsonl` for all 17 sessions, with clearer key concepts and multi-session labels
+- Then phase 3: abstention set, quiz eval, agent trajectory, red-team v0

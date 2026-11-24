@@ -115,7 +115,7 @@ Milestone M6 is the first point where I have an end-to-end app I can use for my 
 
 ## Where we are now
 - Current milestone: **M6** (2026-11-14: M5 slice done: `rag/answer.py` with grounded citations, smoke test passes, ~$0.0005/question, D020. M6 app "VivaPrep AI" in `app/` (Streamlit, dark theme, pipeline strip, retrieval panel), D021–D022. New UI not yet checked on screen.)
-- **Eval track (plan: 6 phases):** Phase 1 done 2026-11-21: 3-run baseline, closed-book 0.79 vs RAG 0.74 (tie, ranges overlap), RAG 0.90 when retrieval hits / 0.24 when it misses, error analysis, D023. **Next:** Phase 2 judge validation (hand-label ~50) → 1d `rag_v1.jsonl` (all 17 sessions)
+- **Eval track (plan: 6 phases):** Phase 1 done 2026-11-21: 3-run baseline, closed-book 0.79 vs RAG 0.74 (tie, ranges overlap), RAG 0.90 when retrieval hits / 0.24 when it misses, error analysis, D023. Phase 2 done 2026-11-23: judge validated on 73 blind labels (agreement ~0.93, kappa ~0.79, 3% self-flips), rubric prompt v2 no better → kept v1, D024. **Next:** 1d `rag_v1.jsonl` (all 17 sessions, clearer key concepts, multi-session labels) → Phase 3
 - **Open from M5:** unit tests (`format_context`, citation validation), abstention set
 - **Next (app):** check UI → demo video + LinkedIn post → Supabase → deploy (private HF Space)
 - Open from M4: explain-back Q2–4; deferred to M7: reranker, 800 vs `None`, Voyage vs BGE-M3
