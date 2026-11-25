@@ -6,7 +6,8 @@ Run from the repo root:
 
 import sys
 
-from llm import ask
+from llm import ask, langfuse
+from langfuse import observe
 from rag.search import search
 from schemas import GroundedAnswer, RagResult
 
@@ -47,6 +48,8 @@ def format_context(chunks: list[dict]) -> str:
     return "\n\n".join(blocks)
 
 
+# Langfuse: the parent of one question's trace. search() and ask() run inside it, so they nest under it
+@observe(as_type="chain", name="answer", capture_input=False, capture_output=False)
 def answer(question: str, k: int = 5, model=None, session: int | None = None) -> RagResult:
     """Retrieve k chunks, ask Claude to answer from them, and check the citations."""
     # 1. Retrieve: the k chunks closest in meaning to the question
@@ -76,6 +79,17 @@ def answer(question: str, k: int = 5, model=None, session: int | None = None) ->
         else:
             invalid_citations.append(citation)
     grounded.citations = valid_citations
+
+    # The question in, the answer out, plus what to scan for when debugging
+    langfuse.update_current_span(
+        input={"question": question, "k": k, "session": session},
+        output=grounded.answer,
+        metadata={
+            "in_course": grounded.in_course,
+            "citations": len(valid_citations),
+            "invalid_citations": len(invalid_citations),
+        },
+    )
 
     # 6. Return everything the eval needs
     return RagResult(

@@ -11,9 +11,13 @@ import sys
 import numpy as np
 import psycopg
 from dotenv import load_dotenv
+from langfuse import get_client, observe
 from pgvector.psycopg import register_vector
 
 from rag.embeddings import embed, load_model
+
+load_dotenv()                   # LANGFUSE_* keys must be loaded before get_client()
+langfuse = get_client()
 
 # <=> is pgvector's cosine DISTANCE: 0 = same meaning, bigger = less similar.
 SEARCH_SQL = """
@@ -49,6 +53,8 @@ WHERE session = %s
 ORDER BY chunk_id
 """
 
+# Langfuse: a "retriever" step. capture_input=False: model= is the BGE-M3 object, which would show as junk
+@observe(as_type="retriever", name="search", capture_input=False, capture_output=False)
 def search(question: str, k: int = 5, model=None, session: int | None = None) -> list[dict]:
     """Return the k chunks closest in meaning to the question, best first.
 
@@ -81,6 +87,15 @@ def search(question: str, k: int = 5, model=None, session: int | None = None) ->
             "text": text,
             "score": score,
         })
+
+    # Send ids, sessions and scores only: the full texts already appear in the Claude generation's input
+    found = []
+    for r in results:
+        found.append({"chunk_id": r["chunk_id"], "session": r["session"], "score": round(r["score"], 3)})
+    langfuse.update_current_span(
+        input={"question": question, "k": k, "session": session},
+        output=found,
+    )
     return results
 
 
