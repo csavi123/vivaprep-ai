@@ -5,10 +5,12 @@ import random
 import time
 import anthropic
 import dotenv
+from langfuse import get_client, observe
 from schemas import LLMResult, TutorAnswer
 from pydantic import BaseModel
 dotenv.load_dotenv()
-client=anthropic.Anthropic(max_retries=0)
+langfuse = get_client()        # reads LANGFUSE_* keys from .env
+client=anthropic.Anthropic(max_retries=0, open_telemetry=False)          # SDK's own tracing off: our @observe generation records the call 
 LOG_FILE= Path("logs/llm_calls.jsonl")
 
 HAIKU_INPUT_PRICE_PER_MTOK = 0.10
@@ -40,6 +42,9 @@ def log_call(model: str, result: LLMResult) -> None:
 
 
 
+# Langfuse: record each call as a "generation" (an LLM call with model, tokens, cost).
+# capture_*=False: we set clean input/output ourselves below, instead of dumping every argument.
+@observe(as_type="generation", name="claude", capture_input=False, capture_output=False)
 def ask(prompt: str, model: str="claude-haiku-5-5", max_tokens: int=DEFAULT_MAX_TOKENS,output_format: type[BaseModel] | None = None)->LLMResult:
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
@@ -61,6 +66,15 @@ def ask(prompt: str, model: str="claude-haiku-5-5", max_tokens: int=DEFAULT_MAX_
             cost= message.usage.input_tokens/1000000 * HAIKU_INPUT_PRICE_PER_MTOK + message.usage.output_tokens/1000000 * HAIKU_OUTPUT_PRICE_PER_MTOK
             result= LLMResult(text=message.content[-1].text,input_tokens=message.usage.input_tokens,output_tokens=message.usage.output_tokens,cost_usd=cost,latency_s=latency,stop_reason=message.stop_reason, parsed=message.parsed_output)
             log_call(model, result)        # write the receipt
+            # Second receipt, sent to Langfuse: our own tokens and cost, so it doesn't guess prices
+            langfuse.update_current_generation(
+                model=model,
+                input=prompt,
+                output=result.text,
+                usage_details={"input": result.input_tokens, "output": result.output_tokens},
+                cost_details={"total": cost},
+                metadata={"stop_reason": result.stop_reason, "latency_s": latency},
+            )
             return result
         except anthropic.APIStatusError as e:
             if e.status_code not in RETRYABLE_STATUS_CODES:

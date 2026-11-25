@@ -11,9 +11,13 @@ import sys
 import numpy as np
 import psycopg
 from dotenv import load_dotenv
+from langfuse import get_client, observe
 from pgvector.psycopg import register_vector
 
 from rag.embeddings import embed, load_model
+
+load_dotenv()                   # LANGFUSE_* keys must be loaded before get_client()
+langfuse = get_client()
 
 # <=> is pgvector's cosine DISTANCE: 0 = same meaning, bigger = less similar.
 SEARCH_SQL = """
@@ -49,6 +53,8 @@ WHERE session = %s
 ORDER BY chunk_id
 """
 
+# Langfuse: a "retriever" step. capture_input=False: model= is the BGE-M3 object, which would show as junk
+@observe(as_type="retriever", name="search", capture_input=False, capture_output=False)
 def search(question: str, k: int = 5, model=None, session: int | None = None) -> list[dict]:
     """Return the k chunks closest in meaning to the question, best first.
 
@@ -57,17 +63,20 @@ def search(question: str, k: int = 5, model=None, session: int | None = None) ->
     if model is None:
         model = load_model()        # slow: callers asking many questions should pass a model in
 
-    question_vector = np.array(embed(model, [question])[0])  # normalise_embeddings= True
+    # Timed as its own step in Langfuse: is search slow because of the model or the database?
+    with langfuse.start_as_current_observation(name="embed", as_type="span"):
+        question_vector = np.array(embed(model, [question])[0])  # normalise_embeddings= True
 
     load_dotenv(".env")             # for DATABASE_URL
-    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
-        register_vector(conn)
-        if session is None:
-            # 2 %s slots, left to right: the question vector, then k
-            rows = conn.execute(SEARCH_SQL, (question_vector, k)).fetchall()
-        else:
-            # 3 %s slots, left to right: the question vector, the session, then k
-            rows = conn.execute(SEARCH_SQL_BY_SESSION, (question_vector, session, k)).fetchall()
+    with langfuse.start_as_current_observation(name="db", as_type="span"):
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+            register_vector(conn)
+            if session is None:
+                # 2 %s slots, left to right: the question vector, then k
+                rows = conn.execute(SEARCH_SQL, (question_vector, k)).fetchall()
+            else:
+                # 3 %s slots, left to right: the question vector, the session, then k
+                rows = conn.execute(SEARCH_SQL_BY_SESSION, (question_vector, session, k)).fetchall()
 
     results = []
     for row in rows:
@@ -81,6 +90,15 @@ def search(question: str, k: int = 5, model=None, session: int | None = None) ->
             "text": text,
             "score": score,
         })
+
+    # Send ids, sessions and scores only: the full texts already appear in the Claude generation's input
+    found = []
+    for r in results:
+        found.append({"chunk_id": r["chunk_id"], "session": r["session"], "score": round(r["score"], 3)})
+    langfuse.update_current_span(
+        input={"question": question, "k": k, "session": session},
+        output=found,
+    )
     return results
 
 

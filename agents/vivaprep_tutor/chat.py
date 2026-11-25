@@ -13,7 +13,9 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
-from llm import HAIKU_INPUT_PRICE_PER_MTOK, HAIKU_OUTPUT_PRICE_PER_MTOK
+from langfuse import observe
+
+from llm import HAIKU_INPUT_PRICE_PER_MTOK, HAIKU_OUTPUT_PRICE_PER_MTOK, langfuse
 
 from .agent import root_agent   # the dot: agent.py in this same folder
 
@@ -39,6 +41,9 @@ runner = Runner(
 )
 
 
+# Langfuse: one trace per tutor message. Claude calls and searches made inside it should nest under it
+# (to be checked: runner.run() works on a background thread, which can split them into separate traces)
+@observe(as_type="agent", name="tutor", capture_input=False, capture_output=False)
 def run_chat(chat_id: str, message: str, course_session: int | None) -> dict:
     """Send one student message to the tutor agent and collect what happened.
 
@@ -108,6 +113,23 @@ def run_chat(chat_id: str, message: str, course_session: int | None) -> dict:
     cost_usd = (
         input_tokens / 1_000_000 * HAIKU_INPUT_PRICE_PER_MTOK
         + output_tokens / 1_000_000 * HAIKU_OUTPUT_PRICE_PER_MTOK
+    )
+
+    # Langfuse: the student's message in, the answer out, and the agent's own counts
+    searches = 0
+    for entry in trace:
+        if entry["tool"] == "search_course":
+            searches += 1
+    langfuse.update_current_span(
+        input={"message": message, "chat_id": chat_id, "course_session": course_session},
+        output=answer,
+        metadata={
+            "model_calls": model_calls,
+            "searches": searches,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "cost_usd": cost_usd,
+        },
     )
 
     # 5. Everything POST /chat sends back to the UI

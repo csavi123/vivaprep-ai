@@ -40,6 +40,7 @@ def make_client(monkeypatch, answer_function=fake_answer):
     """
     monkeypatch.setenv("API_TOKEN", TOKEN)                          # overrides any API_TOKEN from .env
     monkeypatch.setattr(api.main, "get_shared_model", lambda: FAKE_MODEL)   # main.py's lifespan calls get_shared_model()
+    monkeypatch.setattr(api.main, "embed", lambda model, texts: [])         # ...and the warm-up embed(): skip it, the model is fake
     monkeypatch.setattr(api.main, "answer", answer_function)
     # Use it as `with make_client(...) as client:` -- the `with` runs the lifespan (startup + shutdown)
     return TestClient(api.main.app)

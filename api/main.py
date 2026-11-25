@@ -21,7 +21,7 @@ from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 
 from agents.vivaprep_tutor.chat import run_chat
 from rag.answer import answer
-from rag.embeddings import get_shared_model
+from rag.embeddings import embed, get_shared_model
 from rag.quiz import generate_quiz
 from rag.search import list_sessions
 from schemas import AskRequest, ChatRequest, QuizRequest, RagResult
@@ -56,6 +56,9 @@ async def lifespan(app: FastAPI):
     #    get_shared_model(): the agent's search_course tool (POST /chat) gets this same copy.
     print("loading BGE-M3")              # should appear once per server start, never per request
     state["model"] = get_shared_model()
+
+    # 3. Warm-up: the FIRST embedding on the Mac GPU takes ~1 s of one-time setup
+    embed(state["model"], ["warm up"])
 
     yield                                # the server handles requests while paused here
 

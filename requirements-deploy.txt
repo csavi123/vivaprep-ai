@@ -1,7 +1,12 @@
 # Runtime deps for the Docker image only (API + UI). torch is installed separately (CPU-only) in the Dockerfile.
 anthropic==2.7.0
+# keep 18.x: faster-whisper 1.2.1 still calls av.open(metadata_errors=...)
+av==18.1.0
 fastapi==0.163.1
+faster-whisper==1.2.1
+google-adk==2.14.1
 httpx==0.28.1
+langfuse==5.2.0
 numpy==2.5.4
 pgvector==0.5.1
 psycopg==3.3.8

@@ -358,3 +358,46 @@ So judge() is the messenger. It packages up the question, the answer and the che
 **Next**
 - 1d: `rag_v1.jsonl` for all 17 sessions, with clearer key concepts and multi-session labels
 - Then phase 3: abstention set, quiz eval, agent trajectory, red-team v0
+
+## 2026-11-24 · Eval phases 3c, 4a (Ragas), 4b (Langfuse)
+
+**Built**
+- 3c agent trajectory eval run 3×: 36/36 cases passed; paths vary (summary: 3–5 searches, follow-up: 0–1)
+- Ragas 0.4.4 with Claude Haiku as judge: smoke test on 1 answer, then faithfulness + context recall on the
+  25 frozen session-1 answers (`evals/run_ragas_eval.py`), D025
+- Langfuse Cloud tracing: `llm.ask()` (generation), `answer()` (chain) → `search()` (retriever, with `embed`
+  and `db` inside), tutor `run_chat()` (agent) with ADK's own spans nested under it, D026
+- Warm-up embedding at API startup; deploy requirements brought up to date; README
+
+**Learned**
+- Faithfulness splits the ANSWER into claims and checks them against the chunks; context recall splits the
+  REFERENCE. Same machinery, opposite directions
+- Faithful is not correct: grounded in wrong chunks vs true from the model's memory
+- Ragas metrics are LLM judges too, so they need the same validation as mine
+- A dependency can silently break another: `pip check` after every install; pin the versions everyone accepts
+- `@observe` is a stopwatch on a function; nesting comes from call order, not from passing ids
+- Three libraries can trace the same LLM call: check totals against my own numbers to catch double counting
+- Measure, hypothesise, test cheaply: ruled out threads, database and model reload in one 30 s experiment
+- Patch a name where it is used (`api.main.embed`), not where it is defined
+- A perfect score (36/36, 20/20) means the eval is too easy, not that the system is perfect
+
+**Confused me**
+- Why the agent's Claude calls didn't go through `llm.py` (ADK makes its own Anthropic client)
+- "Local vs localhost": the real difference was a one-off script vs a running server
+- Which token `lifespan` reads (`API_TOKEN`, my own UI↔API password, not an API key)
+- Why patching `rag.embeddings.embed` wouldn't fix the API tests
+
+**Numbers**
+- Ragas: faithfulness 0.95 hit / 0.80 miss; context recall 0.98 hit / 0.38 miss; 25 answers, 0 errors
+- Double counting: 120 → 66 tokens per `ask()` call; tutor message 11k → 5k tokens, $0.002 → $0.001
+- Tutor message: Claude 75–90% of 3.6–5.3 s; db 0.03 s; first-message embed 1.00 s → 0.33 s after warm-up
+- Agent eval: 3 runs ≈ $0.04; Ragas run cost not logged
+
+**Still open**
+- 4a-4: read the Ragas disagreement cases (s2-02, s2-06, s3-04, s4-04) and label them
+- 3b quiz review + quiz judge, 3d red-team set, Phase 3 D-entry
+- Embed 0.03 s vs 0.3 s mystery; environment tags for eval traces; `docker build` with the new deploy deps
+
+**Next**
+- Explain-back questions for Langfuse and Ragas; PR for `evals-phase-4b`
+- Then 4a-4 disagreement review, or streaming for the tutor (the biggest felt-speed win)
