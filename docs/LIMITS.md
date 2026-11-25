@@ -31,3 +31,16 @@ What the code doesn't handle yet. Tick an item off (and note the commit) when it
   off-topic question still costs a Claude call. The UI hides the chunks when the tutor abstains.
   *Idea for M7:* skip the Claude call when the top score is below a threshold, with the threshold chosen from eval
   data (scores of in-course vs off-topic questions), not guessed.
+- [ ] **Warm embedding is slower inside the API than in a script** (found 2026-11-24 with Langfuse, D026).
+  The same question embeds in ~0.03 s in a standalone script (main thread or new threads), but 0.2–0.4 s inside
+  the running API. Not threads, not the database (0.03 s), not a model reload. Unexplained; under 10% of a
+  tutor message, so not chased yet.
+  *Next test:* time `embed()` inside the API with a dummy endpoint; then try `EMBED_DEVICE=cpu`, one change at a time.
+
+## Tracing: Langfuse (found 2026-11-24, D026)
+
+- [ ] **Tests and eval scripts send traces to the same project as the app.** pytest's `search()` calls and
+  every eval run show up next to real questions, so latency and cost views mix test and real traffic.
+  *Fix:* an environment tag (Langfuse `environment`, e.g. `dev` / `eval`), or tracing switched off in tests.
+- [ ] **Traces contain full prompts with course chunks.** Allowed under the current data rule, but a privacy
+  question for any real user data later (M10 memory).
