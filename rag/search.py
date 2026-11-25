@@ -63,17 +63,20 @@ def search(question: str, k: int = 5, model=None, session: int | None = None) ->
     if model is None:
         model = load_model()        # slow: callers asking many questions should pass a model in
 
-    question_vector = np.array(embed(model, [question])[0])  # normalise_embeddings= True
+    # Timed as its own step in Langfuse: is search slow because of the model or the database?
+    with langfuse.start_as_current_observation(name="embed", as_type="span"):
+        question_vector = np.array(embed(model, [question])[0])  # normalise_embeddings= True
 
     load_dotenv(".env")             # for DATABASE_URL
-    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
-        register_vector(conn)
-        if session is None:
-            # 2 %s slots, left to right: the question vector, then k
-            rows = conn.execute(SEARCH_SQL, (question_vector, k)).fetchall()
-        else:
-            # 3 %s slots, left to right: the question vector, the session, then k
-            rows = conn.execute(SEARCH_SQL_BY_SESSION, (question_vector, session, k)).fetchall()
+    with langfuse.start_as_current_observation(name="db", as_type="span"):
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+            register_vector(conn)
+            if session is None:
+                # 2 %s slots, left to right: the question vector, then k
+                rows = conn.execute(SEARCH_SQL, (question_vector, k)).fetchall()
+            else:
+                # 3 %s slots, left to right: the question vector, the session, then k
+                rows = conn.execute(SEARCH_SQL_BY_SESSION, (question_vector, session, k)).fetchall()
 
     results = []
     for row in rows:
